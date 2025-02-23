@@ -1,0 +1,24 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/styro
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    - name: Build
+      run: uv build
+    - name: Publish to PyPI
+      run: uv publish
