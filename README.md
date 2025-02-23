@@ -1,6 +1,6 @@
 # 📦 `styro`: A package manager for OpenFOAM
 
-| ‼️ This is project is still at the proof-of-concept stage. Please try it at your own risk! |
+| ‼️ This project is still at the proof-of-concept stage. Please try it at your own risk! |
 | ---- |
 
 
