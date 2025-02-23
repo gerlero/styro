@@ -154,9 +154,16 @@ class _Package:
 
         try:
             for cmd in self._metadata.get("build", ["wmake all -j"]):
-                subprocess.run(["/bin/bash", "-c", cmd], cwd=repo_path, check=True)  # noqa: S603
+                subprocess.run(  # noqa: S603
+                    ["/bin/bash", "-c", cmd],
+                    cwd=repo_path,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
         except subprocess.CalledProcessError as e:
-            msg = f"Failed to build package '{self.name}'."
+            msg = f"Failed to build package '{self.name}'.\n{e.stderr}"
             raise RuntimeError(msg) from e
 
         new_apps = sorted(
