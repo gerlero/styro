@@ -9,7 +9,7 @@ from pathlib import Path
 import requests
 from git import Repo
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 try:
