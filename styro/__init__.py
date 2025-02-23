@@ -115,6 +115,8 @@ class _Package:
             raise RuntimeError(msg)
 
         repo_url = self._metadata["repo"]
+        if "://" not in repo_url:
+            repo_url = "https://" + repo_url
         if not repo_url.endswith(".git"):
             repo_url += ".git"
 
