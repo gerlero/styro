@@ -50,19 +50,23 @@ Homepage = "https://github.com/gerlero/styro"
 Repository = "https://github.com/gerlero/styro"
 
 [project.scripts]
-styro = "styro.__main__:app"
+styro = "styro:app"
 
 [tool.hatch.version]
-path = "styro/__init__.py"
+path = "styro.py"
 
 [tool.mypy]
-packages = ["styro"]
+modules = ["styro"]
 
 [tool.ruff.lint]
 extend-select = ["ALL"]
 extend-ignore = [
+    "C901",
     "COM812",
     "D",
     "E501",
+    "PERF203",
+    "PLR0912",
+    "PLR0915",
     "S101",
 ]
