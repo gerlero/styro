@@ -36,7 +36,6 @@ pip install styro
 
 ## Major TODO list
 
-- Enforce OpenFOAM version constraints
 - Add CMake support
 - Add locking to allow concurrent operations
 - Add tests

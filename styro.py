@@ -36,6 +36,60 @@ def _platform_path() -> Path:
     return platform_path
 
 
+def _check_version_compatibility(specs: list[str]) -> None:
+    if not specs:
+        return
+
+    openfoam_version = int(os.environ["FOAM_API"])
+    distro_compatibility = False
+
+    for spec in specs:
+        try:
+            if spec.startswith("=="):
+                version = int(spec[2:])
+                compatible = openfoam_version == version
+            elif spec.startswith("!="):
+                version = int(spec[2:])
+                compatible = openfoam_version != version
+            elif spec.startswith(">="):
+                version = int(spec[2:])
+                compatible = openfoam_version >= version
+            elif spec.startswith(">"):
+                version = int(spec[1:])
+                compatible = openfoam_version > version
+            elif spec.startswith("<="):
+                version = int(spec[2:])
+                compatible = openfoam_version <= version
+            elif spec.startswith("<"):
+                version = int(spec[1:])
+                compatible = openfoam_version < version
+            else:
+                typer.echo(
+                    f"Warning: Ignoring invalid version specifier '{spec}'.", err=True
+                )
+                continue
+        except ValueError:
+            typer.echo(
+                f"Warning: Ignoring invalid version specifier '{spec}'.", err=True
+            )
+            continue
+
+        if (openfoam_version < 1000) == (version < 1000):  # noqa: PLR2004
+            distro_compatibility = True
+
+            if not compatible:
+                typer.echo(
+                    f"Error: OpenFOAM version is {openfoam_version}, but package requires {spec}.",
+                    err=True,
+                )
+
+    if not distro_compatibility:
+        typer.echo(
+            f"Error: Package is not compatible with this OpenFOAM distribution (requires {specs}).",
+            err=True,
+        )
+
+
 @app.command()
 def install(packages: list[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
@@ -85,6 +139,9 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
             response.raise_for_status()
 
             metadata = response.json()
+
+            _check_version_compatibility(metadata.get("version", []))
+
             repo_url = metadata["repo"]
             if "://" not in repo_url:
                 repo_url = f"https://{repo_url}"
