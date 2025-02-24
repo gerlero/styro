@@ -24,7 +24,7 @@ pip install styro
 
 
 ## Available commands
-- ```styro install <packages>```: Install a package or packages
+- ```styro install <packages>```: Install a package or packages (pass `--upgrade` to upgrade already installed packages)
 - ```styro uninstall <packages>```: Uninstall a package or packages
 - ```styro freeze```: List installed packages
 
@@ -38,6 +38,5 @@ pip install styro
 
 - Enforce OpenFOAM version constraints
 - Add CMake support
-- Add upgrade option
 - Add locking to allow concurrent operations
 - Add tests
