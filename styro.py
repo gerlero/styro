@@ -170,18 +170,30 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
 
     for package, repo_url, build in zip(packages, repo_urls, builds):
         if repo_url is None:
+            assert not upgrade
             assert build is None
             typer.echo(f"Package '{package}' is already installed.")
             continue
 
-        typer.echo(f"Downloading {package}...")
-
+        pkg_path = platform_path / "styro" / "pkg" / package
         try:
-            shutil.rmtree(platform_path / "styro" / "pkg" / package, ignore_errors=True)
-            repo = Repo.clone_from(repo_url, platform_path / "styro" / "pkg" / package)
-        except Exception as e:
-            typer.echo(f"Error downloading package '{package}': {e}")
-            raise typer.Exit(code=1) from e
+            repo = Repo(pkg_path)
+            if repo.remotes.origin.url != repo_url:
+                repo.remote("origin").set_url(repo_url)
+            default_branch = repo.remotes.origin.refs[0].name.split("/")[-1]
+            repo.git.checkout(default_branch)
+            repo.remotes.origin.fetch()
+            repo.git.reset("--hard", f"origin/{default_branch}")
+            typer.echo(f"Updating {package}...")
+            repo.git.pull()
+        except Exception:  # noqa: BLE001
+            try:
+                shutil.rmtree(pkg_path, ignore_errors=True)
+                typer.echo(f"Downloading {package}...")
+                repo = Repo.clone_from(repo_url, pkg_path)
+            except Exception as e:
+                typer.echo(f"Error downloading package '{package}': {e}")
+                raise typer.Exit(code=1) from e
 
         if package in installed["packages"]:
             assert upgrade
@@ -199,7 +211,7 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
                 with contextlib.suppress(FileNotFoundError):
                     (platform_path / "lib" / lib).unlink()
 
-            shutil.rmtree(platform_path / "styro" / "pkg" / package, ignore_errors=True)
+            shutil.rmtree(pkg_path, ignore_errors=True)
 
             del installed["packages"][package]
 
@@ -219,7 +231,7 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
             try:
                 subprocess.run(  # noqa: S603
                     ["/bin/bash", "-c", cmd],
-                    cwd=platform_path / "styro" / "pkg" / package,
+                    cwd=pkg_path,
                     check=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
@@ -256,9 +268,7 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
                     with contextlib.suppress(FileNotFoundError):
                         lib.unlink()
 
-                shutil.rmtree(
-                    platform_path / "styro" / "pkg" / package, ignore_errors=True
-                )
+                shutil.rmtree(pkg_path, ignore_errors=True)
 
                 raise typer.Exit(code=1) from e
 
