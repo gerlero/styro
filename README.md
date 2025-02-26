@@ -10,17 +10,26 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Publish](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml)
 [![PyPI](https://img.shields.io/pypi/v/styro)](https://pypi.org/project/styro/)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/styro)](https://anaconda.org/conda-forge/styro)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/styro)](https://pypi.org/project/styro/)
 ![OpenFOAM](https://img.shields.io/badge/openfoam-.com%20|%20.org-informational)
 
 
 ## Installation
 
-```bash
-pip install styro
-```
+* With [pip](https://pypi.org/project/pip/) (Python 3.7 or later):
 
-**styro** requires OpenFOAM, Python 3.7 or later, and Git.
+    ```bash
+    pip install styro
+    ```
+
+* With [conda](https://docs.conda.io/en/latest/):
+
+    ```bash
+    conda install -c conda-forge styro
+    ```
+
+**styro** requires OpenFOAM (from [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
 
 ## Available commands
