@@ -46,5 +46,4 @@
 ## Major TODO list
 
 - Add CMake support
-- Add locking to allow concurrent operations
 - Add tests
