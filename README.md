@@ -1,8 +1,4 @@
-# 📦 `styro`: A package manager for OpenFOAM
-
-| ‼️ This project is still at the proof-of-concept stage. Please try it at your own risk! |
-| ---- |
-
+# 📦 `styro`: A community package manager for OpenFOAM
 
 [![CI](https://github.com/gerlero/styro/actions/workflows/ci.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/ci.yml)
 [![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
@@ -11,13 +7,12 @@
 [![Publish](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml)
 [![PyPI](https://img.shields.io/pypi/v/styro)](https://pypi.org/project/styro/)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/styro)](https://anaconda.org/conda-forge/styro)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/styro)](https://pypi.org/project/styro/)
 ![OpenFOAM](https://img.shields.io/badge/openfoam-.com%20|%20.org-informational)
 
 
 ## Installation
 
-* With [pip](https://pypi.org/project/pip/) (Python 3.7 or later):
+* With [pip](https://pypi.org/project/pip/) (requires Python 3.7 or later):
 
     ```bash
     pip install styro
@@ -29,7 +24,7 @@
     conda install -c conda-forge styro
     ```
 
-**styro** requires OpenFOAM (from [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
+To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
 
 ## Available commands
@@ -40,10 +35,4 @@
 
 ## Available packages
 
-**styro** is able to install packages listed in the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi).
-
-
-## Major TODO list
-
-- Add CMake support
-- Add tests
+**styro** is able to install community packages listed in the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi).
