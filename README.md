@@ -24,6 +24,12 @@
     conda install -c conda-forge styro
     ```
 
+* With [Homebrew](https://brew.sh/):
+
+    ```bash
+    brew install gerlero/openfoam/styro
+    ```
+
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
 
