@@ -48,12 +48,13 @@ def _installed(*, write: bool = False) -> Generator[dict, None, None]:
     platform_path = _platform_path()
 
     (platform_path / "styro").mkdir(exist_ok=True)
-    with (platform_path / "styro" / "installed.json").open("w+") as f:
+    with (platform_path / "styro" / "installed.json").open("a+") as f:
         fcntl.flock(f, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
-        try:
-            installed = json.load(f)
-        except json.JSONDecodeError:
+        if f.tell() == 0:
             installed = {"version": 1, "packages": {}}
+        else:
+            f.seek(0)
+            installed = json.load(f)
 
         if installed.get("version") != 1:
             typer.echo(
