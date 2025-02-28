@@ -18,7 +18,7 @@ import requests
 import typer
 from git import Repo
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 app = typer.Typer()
 
