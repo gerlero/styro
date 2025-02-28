@@ -48,15 +48,16 @@ def _installed(*, write: bool = False) -> Generator[dict, None, None]:
     platform_path = _platform_path()
 
     (platform_path / "styro").mkdir(exist_ok=True)
-    with (platform_path / "styro" / "installed.json").open("r+") as f:
+    with (platform_path / "styro" / "installed.json").open("w+") as f:
         fcntl.flock(f, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
-
-        installed = json.load(f)
-        if not installed:
+        try:
+            installed = json.load(f)
+        except json.JSONDecodeError:
             installed = {"version": 1, "packages": {}}
-        elif installed.get("version") != 1:
+
+        if installed.get("version") != 1:
             typer.echo(
-                "Error: installed.json file is of a different version. Please upgrade styro.",
+                "Error: installed.json file is of a newer version. Please upgrade styro.",
                 err=True,
             )
             raise typer.Exit(code=1)
