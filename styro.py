@@ -47,10 +47,13 @@ def _platform_path() -> Path:
 def _installed(*, write: bool = False) -> Generator[dict, None, None]:
     platform_path = _platform_path()
 
-    (platform_path / "styro").mkdir(exist_ok=True)
-    with (platform_path / "styro" / "installed.json").open("a+") as f:
+    installed_path = platform_path / "styro" / "installed.json"
+
+    installed_path.parent.mkdir(exist_ok=True)
+    installed_path.touch(exist_ok=True)
+    with installed_path.open("r+" if write else "r") as f:
         fcntl.flock(f, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
-        if f.tell() == 0:
+        if f.seek(0, os.SEEK_END) == 0:
             installed = {"version": 1, "packages": {}}
         else:
             f.seek(0)
