@@ -9,7 +9,7 @@ runner = CliRunner()
 
 
 @pytest.mark.skipif(
-    int(os.environ["FOAM_API"]) < 2112,  # noqa: PLR2004
+    int(os.environ.get("FOAM_API", 0)) < 2112,  # noqa: PLR2004
     reason="requires OpenFOAM v2112 or later",
 )
 def test_porousmicrotransport() -> None:
