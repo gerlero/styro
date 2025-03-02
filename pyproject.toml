@@ -72,6 +72,7 @@ extend-ignore = [
     "COM812",
     "D",
     "E501",
+    "FA100",
     "PERF203",
     "PLR0912",
     "PLR0915",
