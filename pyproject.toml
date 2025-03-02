@@ -42,9 +42,14 @@ typing = [
     "mypy>=1,<2",
     "types-requests"
 ]
+test = [
+    "pytest>7,<9",
+    "pytest-cov",
+]
 dev = [
     "styro[lint]",
     "styro[typing]",
+    "styro[test]",
 ]
 
 [project.urls]
