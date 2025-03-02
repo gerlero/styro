@@ -79,7 +79,11 @@ def _check_version_compatibility(specs: list[str]) -> None:
     if not specs:
         return
 
-    openfoam_version = int(os.environ["FOAM_API"])
+    openfoam_version_str = os.environ["WM_PROJECT_VERSION"]
+    if openfoam_version_str.startswith("v"):
+        openfoam_version = int(openfoam_version_str[1:])
+    else:
+        openfoam_version = int(openfoam_version_str)
     distro_compatibility = False
 
     for spec in specs:
