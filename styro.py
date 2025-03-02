@@ -49,7 +49,7 @@ def _installed(*, write: bool = False) -> Generator[dict, None, None]:
 
     installed_path = platform_path / "styro" / "installed.json"
 
-    installed_path.parent.mkdir(exist_ok=True)
+    installed_path.parent.mkdir(parents=True, exist_ok=True)
     installed_path.touch(exist_ok=True)
     with installed_path.open("r+" if write else "r") as f:
         fcntl.flock(f, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
