@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import contextlib
 import fcntl
 import json
@@ -8,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import List, Optional
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -75,7 +74,7 @@ def _installed(*, write: bool = False) -> Generator[dict, None, None]:
                 f.truncate()
 
 
-def _check_version_compatibility(specs: list[str]) -> None:
+def _check_version_compatibility(specs: List[str]) -> None:
     if not specs:
         return
 
@@ -134,14 +133,14 @@ def _check_version_compatibility(specs: list[str]) -> None:
 
 
 @app.command()
-def install(packages: list[str], *, upgrade: bool = False) -> None:
+def install(packages: List[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
     packages = [package.lower().replace("_", "-") for package in packages]
     platform_path = _platform_path()
 
     with _installed(write=True) as installed:
-        repo_urls: list[str | None] = []
-        builds: list[list[str] | None] = []
+        repo_urls: List[Optional[str]] = []
+        builds: List[Optional[str]] = []
         for package in packages:
             typer.echo(f"Resolving {package}...")
 
@@ -352,7 +351,7 @@ def install(packages: list[str], *, upgrade: bool = False) -> None:
 
 
 @app.command()
-def uninstall(packages: list[str]) -> None:
+def uninstall(packages: List[str]) -> None:
     """Uninstall OpenFOAM packages."""
     packages = [package.lower().replace("_", "-") for package in packages]
     platform_path = _platform_path()
