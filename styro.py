@@ -1,3 +1,5 @@
+"""A community package manager for OpenFOAM."""
+
 import contextlib
 import fcntl
 import json
@@ -19,7 +21,7 @@ from git import Repo
 
 __version__ = "0.1.9"
 
-app = typer.Typer()
+app = typer.Typer(help=__doc__)
 
 
 def _platform_path() -> Path:
