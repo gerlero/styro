@@ -33,7 +33,7 @@ Choose any of the following methods:
     ```bash
     brew install gerlero/openfoam/styro
     ```
-* Standalone binary (download and extract to a directory in your PATH):
+* Standalone binary (download and extract to `$FOAM_USER_APPBIN`):
 
     [🐧 Linux](https://github.com/gerlero/styro/releases/latest/download/styro-Linux-X64.tar.gz) |  [🍏 macOS (Apple silicon)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-ARM64.tar.gz) | [🍎 macOS (Intel)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-X64.tar.gz)
 
