@@ -46,10 +46,12 @@ test = [
     "pytest>7,<9",
     "pytest-cov",
 ]
+binary = ["pyinstaller>=5,<7"]
 dev = [
     "styro[lint]",
     "styro[typing]",
     "styro[test]",
+    "styro[binary]",
 ]
 
 [project.urls]
