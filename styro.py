@@ -253,19 +253,33 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
             typer.echo(f"Installing {package}...")
 
-            try:
-                current_apps = {
-                    f for f in (platform_path / "bin").iterdir() if f.is_file()
-                }
-            except FileNotFoundError:
-                current_apps = set()
+            installed_apps = {
+                app
+                for p in installed["packages"]
+                for app in installed["packages"][p].get("apps", [])
+            }
+            installed_libs = {
+                lib
+                for p in installed["packages"]
+                for lib in installed["packages"][p].get("libs", [])
+            }
 
             try:
-                current_libs = {
-                    f for f in (platform_path / "lib").iterdir() if f.is_file()
+                current_apps = {
+                    f: f.stat().st_mtime
+                    for f in (platform_path / "bin").iterdir()
+                    if f.is_file()
                 }
             except FileNotFoundError:
-                current_libs = set()
+                current_apps = {}
+            try:
+                current_libs = {
+                    f: f.stat().st_mtime
+                    for f in (platform_path / "lib").iterdir()
+                    if f.is_file()
+                }
+            except FileNotFoundError:
+                current_libs = {}
 
             for cmd in build:
                 try:
@@ -287,7 +301,12 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                         new_apps = sorted(
                             f
                             for f in (platform_path / "bin").iterdir()
-                            if f.is_file() and f not in current_apps
+                            if f.is_file()
+                            and f not in installed_apps
+                            and (
+                                f not in current_apps
+                                or f.stat().st_mtime > current_apps[f]
+                            )
                         )
                     except FileNotFoundError:
                         new_apps = []
@@ -296,7 +315,12 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                         new_libs = sorted(
                             f
                             for f in (platform_path / "lib").iterdir()
-                            if f.is_file() and f not in current_libs
+                            if f.is_file()
+                            and f not in installed_libs
+                            and (
+                                f not in current_libs
+                                or f.stat().st_mtime > current_libs[f]
+                            )
                         )
                     except FileNotFoundError:
                         new_libs = []
