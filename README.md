@@ -1,4 +1,4 @@
-# 📦 `styro`: A community package manager for OpenFOAM
+# 🏗️ `styro`: A community package manager for OpenFOAM
 
 [![CI](https://github.com/gerlero/styro/actions/workflows/ci.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/ci.yml)
 [![Codecov](https://codecov.io/gh/gerlero/styro/branch/main/graph/badge.svg)](https://codecov.io/gh/gerlero/styro)
@@ -8,10 +8,13 @@
 [![Publish](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml)
 [![PyPI](https://img.shields.io/pypi/v/styro)](https://pypi.org/project/styro/)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/styro)](https://anaconda.org/conda-forge/styro)
+[![Binaries](https://github.com/gerlero/styro/actions/workflows/binaries.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/binaries.yml)
 ![OpenFOAM](https://img.shields.io/badge/openfoam-.com%20|%20.org-informational)
 
 
-## Installation
+## ⏬ Installation
+
+Choose any of the following methods:
 
 * With [pip](https://pypi.org/project/pip/) (requires Python 3.7 or later):
 
@@ -30,16 +33,19 @@
     ```bash
     brew install gerlero/openfoam/styro
     ```
+* Standalone binary (download and extract to a directory in your PATH):
+
+    [🐧 Linux](https://github.com/gerlero/styro/releases/latest/download/styro-Linux-X64.tar.gz) |  [🍏 macOS (Apple silicon)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-ARM64.tar.gz) | [🍎 macOS (Intel)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-X64.tar.gz)
 
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
 
-## Available commands
+## ✅ Available commands
 - ```styro install <packages>```: Install a package or packages (pass `--upgrade` to upgrade already installed packages)
 - ```styro uninstall <packages>```: Uninstall a package or packages
 - ```styro freeze```: List installed packages
 
 
-## Available packages
+## 📦 Available packages
 
 **styro** is able to install community packages listed in the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi).
