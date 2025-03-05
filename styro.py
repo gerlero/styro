@@ -2,11 +2,14 @@
 
 import contextlib
 import fcntl
+import io
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -146,6 +149,20 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
         for package in packages:
             typer.echo(f"Resolving {package}...")
 
+            if package == "styro":
+                repo_urls.append(None)
+                builds.append(None)
+                if upgrade and (
+                    not getattr(sys, "frozen", False)
+                    or not (platform_path / "bin" / "styro").is_file()
+                ):
+                    typer.echo(
+                        "Error: This is a managed installation of styro.\nUse your package manager (e.g. pip) to upgrade styro.",
+                        err=True,
+                    )
+                    raise typer.Exit(code=1)
+                continue
+
             if package in installed["packages"] and not upgrade:
                 repo_urls.append(None)
                 builds.append(None)
@@ -205,6 +222,36 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
         typer.echo(f"Successfully resolved {len(repo_urls)} package(s).")
 
         for package, repo_url, build in zip(packages, repo_urls, builds):
+            if package == "styro":
+                assert repo_url is None
+                assert build is None
+
+                if not upgrade:
+                    typer.echo("Package 'styro' is already installed.")
+                    continue
+
+                typer.echo("Downloading styro...")
+                system = platform.system()
+                if system == "Darwin":
+                    system = "macOS"
+                arch = platform.machine()
+                if arch == "AMD64":
+                    arch = "X64"
+                elif arch == "arm64":
+                    arch = "ARM64"
+                response = requests.get(
+                    f"https://github.com/gerlero/styro/releases/latest/download/styro-{system}-{arch}.tar.gz",
+                    timeout=10,
+                )
+                response.raise_for_status()
+                typer.echo("Upgrading styro...")
+                with tarfile.open(
+                    fileobj=io.BytesIO(response.content), mode="r:gz"
+                ) as tar:
+                    tar.extract("styro", path=platform_path / "bin")
+                typer.echo("Package 'styro' upgraded successfully.")
+                continue
+
             if repo_url is None:
                 assert not upgrade
                 assert build is None
@@ -384,6 +431,10 @@ def uninstall(packages: List[str]) -> None:
 
     with _installed(write=True) as installed:
         for package in packages:
+            if package == "styro":
+                typer.echo("Error: Package 'styro' cannot be uninstalled.", err=True)
+                raise typer.Exit(code=1)
+
             if package not in installed["packages"]:
                 typer.echo(
                     f"Warning: skipping package '{package}' as it is not installed.",
