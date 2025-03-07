@@ -22,7 +22,7 @@ import requests
 import typer
 from git import Repo
 
-__version__ = "0.1.10"
+__version__ = "0.1.11"
 
 app = typer.Typer(help=__doc__)
 
