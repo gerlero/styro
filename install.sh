@@ -16,7 +16,9 @@ else
 fi
 
 echo "Press Enter to continue or Ctrl-C to abort."
-read
+read key
+
+echo $key
 
 echo "Downloading and installing styro..."
 mkdir -p "$FOAM_USER_APPBIN"
