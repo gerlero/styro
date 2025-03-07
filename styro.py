@@ -291,17 +291,9 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     raise typer.Exit(code=1)
 
                 typer.echo("Downloading styro...")
-                system = platform.system()
-                if system == "Darwin":
-                    system = "macOS"
-                arch = platform.machine()
-                if arch == "AMD64":
-                    arch = "X64"
-                elif arch == "arm64":
-                    arch = "ARM64"
                 try:
                     response = requests.get(
-                        f"https://github.com/gerlero/styro/releases/latest/download/styro-{system}-{arch}.tar.gz",
+                        f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz",
                         timeout=10,
                     )
                     response.raise_for_status()
