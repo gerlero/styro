@@ -35,7 +35,7 @@ Choose any of the following methods:
     ```
 * Standalone binary (download and extract to `$FOAM_USER_APPBIN`):
 
-    [🐧 Linux](https://github.com/gerlero/styro/releases/latest/download/styro-Linux-X64.tar.gz) |  [🍏 macOS (Apple silicon)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-ARM64.tar.gz) | [🍎 macOS (Intel)](https://github.com/gerlero/styro/releases/latest/download/styro-macOS-X64.tar.gz)
+    [🐧 Linux](https://github.com/gerlero/styro/releases/latest/download/styro-Linux-x86_64.tar.gz) |  [🍏 macOS (Apple silicon)](https://github.com/gerlero/styro/releases/latest/download/styro-Darwin-arm64.tar.gz) | [🍎 macOS (Intel)](https://github.com/gerlero/styro/releases/latest/download/styro-Darwin-x86_64.tar.gz)
 
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
