@@ -37,7 +37,7 @@ Choose any of the following methods:
 * Standalone binary (installs to `$FOAM_USER_APPBIN`):
 
     ```bash
-    curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh | sh
+    /bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
     ```
 
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
