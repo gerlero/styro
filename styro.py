@@ -47,6 +47,49 @@ def _platform_path() -> Path:
     return platform_path
 
 
+def _is_managed_installation() -> bool:
+    return not getattr(sys, "frozen", False)
+
+
+def _print_upgrade_instruction() -> None:
+    if _is_managed_installation():
+        typer.echo(
+            "Use your package manager (e.g. pip) to upgrade styro.",
+            err=True,
+        )
+    else:
+        typer.echo(
+            "Run 'styro install --upgrade styro' to upgrade styro.",
+            err=True,
+        )
+
+
+def _check_for_new_version(*, verbose: bool = True) -> bool:
+    try:
+        response = requests.get(
+            "https://api.github.com/repos/gerlero/styro/releases/latest",
+            timeout=2,
+        )
+        response.raise_for_status()
+        latest_version = response.json()["tag_name"]
+    except Exception:  # noqa: BLE001
+        return False
+
+    if latest_version.startswith("v"):
+        latest_version = latest_version[1:]
+
+    if latest_version != __version__:
+        if verbose:
+            typer.echo(
+                f"Warning: you are using styro {__version__}, but version {latest_version} is available.",
+                err=True,
+            )
+            _print_upgrade_instruction()
+        return True
+
+    return False
+
+
 @contextlib.contextmanager
 def _installed(*, write: bool = False) -> Generator[dict, None, None]:
     platform_path = _platform_path()
@@ -143,6 +186,9 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
     packages = [package.lower().replace("_", "-") for package in packages]
     platform_path = _platform_path()
 
+    if not upgrade or "styro" not in packages:
+        _check_for_new_version(verbose=True)
+
     with _installed(write=True) as installed:
         repo_urls: List[Optional[str]] = []
         builds: List[Optional[str]] = []
@@ -152,14 +198,16 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
             if package == "styro":
                 repo_urls.append(None)
                 builds.append(None)
-                if upgrade and (
-                    not getattr(sys, "frozen", False)
-                    or not (platform_path / "bin" / "styro").is_file()
+                if (
+                    upgrade
+                    and _is_managed_installation()
+                    and _check_for_new_version(verbose=False)
                 ):
                     typer.echo(
-                        "Error: This is a managed installation of styro.\nUse your package manager (e.g. pip) to upgrade styro.",
+                        "Error: This is a managed installation of styro.",
                         err=True,
                     )
+                    _print_upgrade_instruction()
                     raise typer.Exit(code=1)
                 continue
 
@@ -230,6 +278,18 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     typer.echo("Package 'styro' is already installed.")
                     continue
 
+                if not _check_for_new_version(verbose=False):
+                    typer.echo("Package 'styro' is already up-to-date.")
+                    continue
+
+                if _is_managed_installation():
+                    typer.echo(
+                        "Error: This is a managed installation of styro.",
+                        err=True,
+                    )
+                    _print_upgrade_instruction()
+                    raise typer.Exit(code=1)
+
                 typer.echo("Downloading styro...")
                 system = platform.system()
                 if system == "Darwin":
@@ -239,16 +299,27 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     arch = "X64"
                 elif arch == "arm64":
                     arch = "ARM64"
-                response = requests.get(
-                    f"https://github.com/gerlero/styro/releases/latest/download/styro-{system}-{arch}.tar.gz",
-                    timeout=10,
-                )
-                response.raise_for_status()
+                try:
+                    response = requests.get(
+                        f"https://github.com/gerlero/styro/releases/latest/download/styro-{system}-{arch}.tar.gz",
+                        timeout=10,
+                    )
+                    response.raise_for_status()
+                except Exception as e:
+                    typer.echo(f"Error: Failed to download styro: {e}", err=True)
+                    raise typer.Exit(code=1) from e
                 typer.echo("Upgrading styro...")
-                with tarfile.open(
-                    fileobj=io.BytesIO(response.content), mode="r:gz"
-                ) as tar:
-                    tar.extract("styro", path=platform_path / "bin")
+                try:
+                    with tarfile.open(
+                        fileobj=io.BytesIO(response.content), mode="r:gz"
+                    ) as tar:
+                        executable = Path(sys.executable)
+                        assert executable.name == "styro"
+                        assert executable.is_file()
+                        tar.extract("styro", path=Path(sys.executable).parent)
+                except Exception as e:
+                    typer.echo(f"Error: Failed to upgrade styro: {e}", err=True)
+                    raise typer.Exit(code=1) from e
                 typer.echo("Package 'styro' upgraded successfully.")
                 continue
 
