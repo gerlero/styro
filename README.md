@@ -33,9 +33,12 @@ Choose any of the following methods:
     ```bash
     brew install gerlero/openfoam/styro
     ```
-* Standalone binary (download and extract to `$FOAM_USER_APPBIN`):
 
-    [🐧 Linux](https://github.com/gerlero/styro/releases/latest/download/styro-Linux-x86_64.tar.gz) |  [🍏 macOS (Apple silicon)](https://github.com/gerlero/styro/releases/latest/download/styro-Darwin-arm64.tar.gz) | [🍎 macOS (Intel)](https://github.com/gerlero/styro/releases/latest/download/styro-Darwin-x86_64.tar.gz)
+* Standalone binary (installs to `$FOAM_USER_APPBIN`):
+
+    ```bash
+    curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh | sh
+    ```
 
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
