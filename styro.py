@@ -20,7 +20,6 @@ else:
 
 import requests
 import typer
-from git import Repo
 
 __version__ = "0.1.11"
 
@@ -322,28 +321,95 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 continue
 
             pkg_path = platform_path / "styro" / "pkg" / package
-            try:
-                repo = Repo(pkg_path)
-                if repo.remotes.origin.url != repo_url:
-                    repo.remote("origin").set_url(repo_url)
-                default_branch = repo.remotes.origin.refs[0].name.split("/")[-1]
-                repo.git.checkout(default_branch)
-                repo.remotes.origin.fetch()
-                repo.git.reset("--hard", f"origin/{default_branch}")
+            if (pkg_path / ".git").exists():
                 typer.echo(f"Updating {package}...")
-                repo.git.pull()
-            except Exception:  # noqa: BLE001
                 try:
+                    subprocess.run(
+                        ["git", "remote", "set-url", "origin", repo_url],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    default_branch = (
+                        subprocess.run(
+                            ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
+                            cwd=pkg_path,
+                            check=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL,
+                            text=True,
+                        )
+                        .stdout.strip()
+                        .split("/")[-1]
+                    )
+                    subprocess.run(
+                        ["git", "checkout", default_branch],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    subprocess.run(
+                        ["git", "fetch", "origin"],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    subprocess.run(
+                        ["git", "reset", "--hard", f"origin/{default_branch}"],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    subprocess.run(
+                        ["git", "pull"],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except subprocess.CalledProcessError:
                     shutil.rmtree(pkg_path, ignore_errors=True)
-                    typer.echo(f"Downloading {package}...")
-                    repo = Repo.clone_from(repo_url, pkg_path)
-                except Exception as e:
-                    typer.echo(f"Error downloading package '{package}': {e}")
+                    typer.echo(
+                        f"Warning: failed to update package '{package}'. Redownloading...",
+                        err=True,
+                    )
+
+            if not (pkg_path / ".git").exists():
+                typer.echo(f"Downloading {package}...")
+                shutil.rmtree(pkg_path, ignore_errors=True)
+                pkg_path.mkdir(parents=True)
+                try:
+                    subprocess.run(
+                        ["git", "clone", repo_url, "."],
+                        cwd=pkg_path,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    typer.echo(
+                        f"Error: failed to download package '{package}': {e.stderr}",
+                        err=True,
+                    )
                     raise typer.Exit(code=1) from e
+
+            sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=pkg_path,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).stdout.strip()
 
             if package in installed["packages"]:
                 assert upgrade
-                if repo.head.commit.hexsha == installed["packages"][package]["sha"]:
+                if sha == installed["packages"][package]["sha"]:
                     typer.echo(f"Package '{package}' is already up-to-date.")
                     continue
 
@@ -393,7 +459,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
             for cmd in build:
                 try:
-                    subprocess.run(  # noqa: S603
+                    subprocess.run(
                         ["/bin/bash", "-c", cmd],
                         cwd=pkg_path,
                         check=True,
@@ -468,7 +534,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
             assert package not in installed["packages"]
 
             installed["packages"][package] = {
-                "sha": repo.head.commit.hexsha,
+                "sha": sha,
                 "apps": [app.name for app in new_apps],
                 "libs": [lib.name for lib in new_libs],
             }
