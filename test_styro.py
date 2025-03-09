@@ -3,7 +3,7 @@ import os
 import pytest
 from typer.testing import CliRunner
 
-from styro import app
+from styro import __version__, app
 
 runner = CliRunner()
 
@@ -28,3 +28,10 @@ def test_porousmicrotransport() -> None:
     result = runner.invoke(app, ["freeze"])
     assert result.exit_code == 0
     assert "porousmicrotransport" not in result.stdout
+
+
+def test_version() -> None:
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "styro" in result.stdout
+    assert __version__ in result.stdout

@@ -17,8 +17,11 @@ from typing import Deque, List, Optional
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
+    from typing import Annotated
 else:
     from typing import Generator
+
+    from typing_extensions import Annotated
 
 import requests
 import typer
@@ -608,6 +611,26 @@ def freeze() -> None:
     with _installed() as installed:
         for package in installed["packages"]:
             typer.echo(package)
+
+
+def _version_callback(*, show: bool) -> None:
+    if show:
+        _check_for_new_version(verbose=True)
+        typer.echo(f"styro {__version__}")
+        raise typer.Exit
+
+
+@app.callback()
+def common(
+    *,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version", help="Show version and exit.", callback=_version_callback
+        ),
+    ] = False,
+) -> None:
+    pass
 
 
 if __name__ == "__main__":
