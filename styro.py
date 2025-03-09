@@ -29,7 +29,7 @@ app = typer.Typer(help=__doc__)
 
 
 def _run(
-    cmd: List[str], *, cwd: Optional[Path] = None, check: bool = False, lines: int = 4
+    cmd: List[str], *, cwd: Optional[Path] = None, lines: int = 4
 ) -> subprocess.CompletedProcess:
     with subprocess.Popen(
         cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
@@ -63,7 +63,7 @@ def _run(
 
         proc.wait()
 
-        if check and proc.returncode != 0:
+        if proc.returncode != 0:
             raise subprocess.CalledProcessError(
                 returncode=proc.returncode, cmd=cmd, output=stdout, stderr=stderr
             )
@@ -376,13 +376,11 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     _run(
                         ["git", "remote", "set-url", "origin", repo_url],
                         cwd=pkg_path,
-                        check=True,
                     )
                     default_branch = (
                         _run(
                             ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
                             cwd=pkg_path,
-                            check=True,
                         )
                         .stdout.strip()
                         .split("/")[-1]
@@ -390,22 +388,15 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     _run(
                         ["git", "checkout", default_branch],
                         cwd=pkg_path,
-                        check=True,
                     )
-                    _run(
-                        ["git", "fetch", "origin"],
-                        cwd=pkg_path,
-                        check=True,
-                    )
+                    _run(["git", "fetch", "origin"], cwd=pkg_path)
                     _run(
                         ["git", "reset", "--hard", f"origin/{default_branch}"],
                         cwd=pkg_path,
-                        check=True,
                     )
                     _run(
                         ["git", "pull"],
                         cwd=pkg_path,
-                        check=True,
                     )
                 except subprocess.CalledProcessError:
                     shutil.rmtree(pkg_path, ignore_errors=True)
@@ -422,7 +413,6 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     _run(
                         ["git", "clone", repo_url, "."],
                         cwd=pkg_path,
-                        check=True,
                     )
                 except subprocess.CalledProcessError as e:
                     typer.echo(
@@ -434,7 +424,6 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
             sha = _run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=pkg_path,
-                check=True,
             ).stdout.strip()
 
             if package in installed["packages"]:
@@ -492,7 +481,6 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     _run(
                         ["/bin/bash", "-c", cmd],
                         cwd=pkg_path,
-                        check=True,
                     )
                 except subprocess.CalledProcessError as e:
                     typer.echo(
