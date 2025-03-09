@@ -6,12 +6,14 @@ import io
 import json
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
+from collections import deque
 from pathlib import Path
-from typing import List, Optional
+from typing import Deque, List, Optional
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -26,13 +28,58 @@ __version__ = "0.1.11"
 app = typer.Typer(help=__doc__)
 
 
+def _run(
+    cmd: List[str], *, cwd: Optional[Path] = None, check: bool = False, lines: int = 4
+) -> subprocess.CompletedProcess:
+    with subprocess.Popen(
+        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    ) as proc:
+        if sys.version_info >= (3, 8):
+            display_cmd = shlex.join(cmd)
+        else:
+            display_cmd = " ".join(shlex.quote(arg) for arg in cmd)
+
+        typer.echo(f"==> \033[1m{display_cmd[:64]}\033[0m")
+
+        out: Deque[str] = deque(maxlen=lines)
+        stdout = ""
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            stdout += line
+
+            for _ in range(len(out)):
+                typer.echo("\033[1A\x1b[2K", nl=False)
+
+            out.append(line.rstrip())
+
+            for ln in out:
+                typer.echo(f"\033[90m{ln[:64]}\033[0m")
+
+        for _ in range(len(out) + 1):
+            typer.echo("\033[1A\x1b[2K", nl=False)
+
+        assert proc.stderr is not None
+        stderr = proc.stderr.read().strip()
+
+        proc.wait()
+
+        if check and proc.returncode != 0:
+            raise subprocess.CalledProcessError(
+                returncode=proc.returncode, cmd=cmd, output=stdout, stderr=stderr
+            )
+
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=proc.returncode, stdout=stdout, stderr=stderr
+        )
+
+
 def _platform_path() -> Path:
     try:
         app_path = Path(os.environ["FOAM_USER_APPBIN"])
         lib_path = Path(os.environ["FOAM_USER_LIBBIN"])
     except KeyError as e:
         typer.echo(
-            "Error: No OpenFOAM environment found. Please activate (source) the OpenFOAM environment first.",
+            "🛑 Error: No OpenFOAM environment found. Please activate (source) the OpenFOAM environment first.",
             err=True,
         )
         raise typer.Exit(code=1) from e
@@ -80,7 +127,7 @@ def _check_for_new_version(*, verbose: bool = True) -> bool:
     if latest_version != __version__:
         if verbose:
             typer.echo(
-                f"Warning: you are using styro {__version__}, but version {latest_version} is available.",
+                f"⚠️ Warning: you are using styro {__version__}, but version {latest_version} is available.",
                 err=True,
             )
             _print_upgrade_instruction()
@@ -154,12 +201,12 @@ def _check_version_compatibility(specs: List[str]) -> None:
                 compatible = openfoam_version < version
             else:
                 typer.echo(
-                    f"Warning: Ignoring invalid version specifier '{spec}'.", err=True
+                    f"⚠️ Warning: Ignoring invalid version specifier '{spec}'.", err=True
                 )
                 continue
         except ValueError:
             typer.echo(
-                f"Warning: Ignoring invalid version specifier '{spec}'.", err=True
+                f"⚠️ Warning: Ignoring invalid version specifier '{spec}'.", err=True
             )
             continue
 
@@ -168,13 +215,13 @@ def _check_version_compatibility(specs: List[str]) -> None:
 
             if not compatible:
                 typer.echo(
-                    f"Error: OpenFOAM version is {openfoam_version}, but package requires {spec}.",
+                    f"🛑 Error: OpenFOAM version is {openfoam_version}, but package requires {spec}.",
                     err=True,
                 )
 
     if not distro_compatibility:
         typer.echo(
-            f"Error: Package is not compatible with this OpenFOAM distribution (requires {specs}).",
+            f"🛑 Error: Package is not compatible with this OpenFOAM distribution (requires {specs}).",
             err=True,
         )
 
@@ -192,7 +239,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
         repo_urls: List[Optional[str]] = []
         builds: List[Optional[str]] = []
         for package in packages:
-            typer.echo(f"Resolving {package}...")
+            typer.echo(f"🔁 Resolving {package}...")
 
             if package == "styro":
                 repo_urls.append(None)
@@ -203,7 +250,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     and _check_for_new_version(verbose=False)
                 ):
                     typer.echo(
-                        "Error: This is a managed installation of styro.",
+                        "🛑 Error: This is a managed installation of styro.",
                         err=True,
                     )
                     _print_upgrade_instruction()
@@ -222,13 +269,13 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 )
             except Exception as e:
                 typer.echo(
-                    f"Error: Failed to resolve package '{package}': {e}", err=True
+                    f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
                 )
                 raise typer.Exit(code=1) from e
 
             if response.status_code == 404:  # noqa: PLR2004
                 typer.echo(
-                    f"Error: Package '{package}' not found in the OpenFOAM Package Index (OPI).\nSee https://github.com/exasim-project/opi for more information.",
+                    f"🛑 Error: Package '{package}' not found in the OpenFOAM Package Index (OPI).\nSee https://github.com/exasim-project/opi for more information.",
                     err=True,
                 )
                 raise typer.Exit(code=1)
@@ -251,7 +298,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 build = metadata.get("build", "wmake")
             except Exception as e:
                 typer.echo(
-                    f"Error: Failed to resolve package '{package}': {e}", err=True
+                    f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
                 )
                 raise typer.Exit(code=1) from e
 
@@ -259,14 +306,14 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 build = ["wmake all -j"]
             elif build == "cmake":
                 typer.echo(
-                    f"Error: CMake build system (required by {package}) is not supported yet.",
+                    f"🛑 Error: CMake build system (required by {package}) is not supported yet.",
                     err=True,
                 )
                 raise typer.Exit(code=1)
 
             builds.append(build)
 
-        typer.echo(f"Successfully resolved {len(repo_urls)} package(s).")
+        typer.echo(f"📦 Successfully resolved {len(repo_urls)} package(s).")
 
         for package, repo_url, build in zip(packages, repo_urls, builds):
             if package == "styro":
@@ -274,22 +321,22 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 assert build is None
 
                 if not upgrade:
-                    typer.echo("Package 'styro' is already installed.")
+                    typer.echo("✋ Package 'styro' is already installed.")
                     continue
 
                 if not _check_for_new_version(verbose=False):
-                    typer.echo("Package 'styro' is already up-to-date.")
+                    typer.echo("✋ Package 'styro' is already up-to-date.")
                     continue
 
                 if _is_managed_installation():
                     typer.echo(
-                        "Error: This is a managed installation of styro.",
+                        "🛑 Error: This is a managed installation of styro.",
                         err=True,
                     )
                     _print_upgrade_instruction()
                     raise typer.Exit(code=1)
 
-                typer.echo("Downloading styro...")
+                typer.echo("⏬ Downloading styro...")
                 try:
                     response = requests.get(
                         f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz",
@@ -297,9 +344,9 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                     )
                     response.raise_for_status()
                 except Exception as e:
-                    typer.echo(f"Error: Failed to download styro: {e}", err=True)
+                    typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
                     raise typer.Exit(code=1) from e
-                typer.echo("Upgrading styro...")
+                typer.echo("⏳ Upgrading styro...")
                 try:
                     with tarfile.open(
                         fileobj=io.BytesIO(response.content), mode="r:gz"
@@ -311,109 +358,90 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 except Exception as e:
                     typer.echo(f"Error: Failed to upgrade styro: {e}", err=True)
                     raise typer.Exit(code=1) from e
-                typer.echo("Package 'styro' upgraded successfully.")
+                typer.echo("✅ Package 'styro' upgraded successfully.")
                 continue
 
             if repo_url is None:
                 assert not upgrade
                 assert build is None
-                typer.echo(f"Package '{package}' is already installed.")
+                typer.echo(f"✋ Package '{package}' is already installed.")
                 continue
 
             pkg_path = platform_path / "styro" / "pkg" / package
             if (pkg_path / ".git").exists():
-                typer.echo(f"Updating {package}...")
+                typer.echo(f"⏬ Updating {package}...")
                 try:
-                    subprocess.run(
+                    _run(
                         ["git", "remote", "set-url", "origin", repo_url],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
                     default_branch = (
-                        subprocess.run(
+                        _run(
                             ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
                             cwd=pkg_path,
                             check=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL,
-                            text=True,
                         )
                         .stdout.strip()
                         .split("/")[-1]
                     )
-                    subprocess.run(
+                    _run(
                         ["git", "checkout", default_branch],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
-                    subprocess.run(
+                    _run(
                         ["git", "fetch", "origin"],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
-                    subprocess.run(
+                    _run(
                         ["git", "reset", "--hard", f"origin/{default_branch}"],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
-                    subprocess.run(
+                    _run(
                         ["git", "pull"],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
                 except subprocess.CalledProcessError:
                     shutil.rmtree(pkg_path, ignore_errors=True)
                     typer.echo(
-                        f"Warning: failed to update package '{package}'. Redownloading...",
+                        f"⚠️ Warning: failed to update package '{package}'. Redownloading...",
                         err=True,
                     )
 
             if not (pkg_path / ".git").exists():
-                typer.echo(f"Downloading {package}...")
+                typer.echo(f"⏬ Downloading {package}...")
                 shutil.rmtree(pkg_path, ignore_errors=True)
                 pkg_path.mkdir(parents=True)
                 try:
-                    subprocess.run(
+                    _run(
                         ["git", "clone", repo_url, "."],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        text=True,
                     )
                 except subprocess.CalledProcessError as e:
                     typer.echo(
-                        f"Error: failed to download package '{package}': {e.stderr}",
+                        f"🛑 Error: failed to download package '{package}'\n{e.stderr}",
                         err=True,
                     )
                     raise typer.Exit(code=1) from e
 
-            sha = subprocess.run(
+            sha = _run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=pkg_path,
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
             ).stdout.strip()
 
             if package in installed["packages"]:
                 assert upgrade
                 if sha == installed["packages"][package]["sha"]:
-                    typer.echo(f"Package '{package}' is already up-to-date.")
+                    typer.echo(f"✋ Package '{package}' is already up-to-date.")
                     continue
 
-                typer.echo(f"Uninstalling {package}...")
+                typer.echo(f"🗑️ Uninstalling {package}...")
 
                 for app in installed["packages"][package]["apps"]:
                     with contextlib.suppress(FileNotFoundError):
@@ -427,7 +455,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
                 del installed["packages"][package]
 
-            typer.echo(f"Installing {package}...")
+            typer.echo(f"⏳ Installing {package}...")
 
             installed_apps = {
                 app
@@ -459,13 +487,10 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
             for cmd in build:
                 try:
-                    subprocess.run(
+                    _run(
                         ["/bin/bash", "-c", cmd],
                         cwd=pkg_path,
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        text=True,
                     )
                 except subprocess.CalledProcessError as e:
                     typer.echo(
@@ -539,15 +564,15 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 "libs": [lib.name for lib in new_libs],
             }
 
-            typer.echo(f"Package '{package}' installed successfully.")
+            typer.echo(f"✅ Package '{package}' installed successfully.")
 
             if new_libs:
-                typer.echo("New libraries:")
+                typer.echo("⚙️ New libraries:")
                 for lib in new_libs:
                     typer.echo(f"  {lib.name}")
 
             if new_apps:
-                typer.echo("New applications:")
+                typer.echo("🖥️ New applications:")
                 for app in new_apps:
                     typer.echo(f"  {app.name}")
 
@@ -561,17 +586,17 @@ def uninstall(packages: List[str]) -> None:
     with _installed(write=True) as installed:
         for package in packages:
             if package == "styro":
-                typer.echo("Error: Package 'styro' cannot be uninstalled.", err=True)
+                typer.echo("🛑 Error: Package 'styro' cannot be uninstalled.", err=True)
                 raise typer.Exit(code=1)
 
             if package not in installed["packages"]:
                 typer.echo(
-                    f"Warning: skipping package '{package}' as it is not installed.",
+                    f"⚠️ Warning: skipping package '{package}' as it is not installed.",
                     err=True,
                 )
                 continue
 
-            typer.echo(f"Uninstalling {package}...")
+            typer.echo(f"⏳ Uninstalling {package}...")
             for app in installed["packages"][package]["apps"]:
                 with contextlib.suppress(FileNotFoundError):
                     (platform_path / "bin" / app).unlink()
@@ -584,7 +609,7 @@ def uninstall(packages: List[str]) -> None:
 
             del installed["packages"][package]
 
-            typer.echo(f"Successfully uninstalled {package}.")
+            typer.echo(f"🗑️ Successfully uninstalled {package}.")
 
 
 @app.command()
