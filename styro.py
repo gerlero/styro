@@ -25,7 +25,7 @@ import typer
 
 __version__ = "0.1.12"
 
-app = typer.Typer(help=__doc__)
+app = typer.Typer(help=__doc__, add_completion=False)
 
 
 def _run(
