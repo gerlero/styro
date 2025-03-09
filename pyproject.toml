@@ -29,7 +29,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "GitPython>=3,<4",
     "requests>=2,<3",
     "typer-slim>=0.13,<0.16",
 ]
@@ -79,4 +78,6 @@ extend-ignore = [
     "PLR0912",
     "PLR0915",
     "S101",
+    "S603",
+    "S607",
 ]
