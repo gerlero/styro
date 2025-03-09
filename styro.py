@@ -288,20 +288,22 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 _check_version_compatibility(metadata.get("version", []))
 
                 repo_url = metadata["repo"]
-                if "://" not in repo_url:
-                    repo_url = f"https://{repo_url}"
-                if not repo_url.endswith(".git"):
-                    repo_url += ".git"
-
-                repo_urls.append(repo_url)
-
-                build = metadata.get("build", "wmake")
             except Exception as e:
                 typer.echo(
                     f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
                 )
                 raise typer.Exit(code=1) from e
 
+            if not repo_url.startswith("https://"):
+                typer.echo(
+                    f"🛑 Error: Unsupported non-HTTPS repository indexed for {package}: {repo_url}",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+
+            repo_urls.append(repo_url)
+
+            build = metadata.get("build", "wmake")
             if build == "wmake":
                 build = ["wmake all -j"]
             elif build == "cmake":
