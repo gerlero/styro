@@ -31,7 +31,7 @@ classifiers = [
 dependencies = [
     "requests>=2,<3",
     "typer-slim>=0.13,<0.16",
-    "typing_extensions>=3.9,<5",
+    "typing_extensions>=3.9,<5; python_version < '3.9'",
 ]
 
 dynamic = ["version"]
