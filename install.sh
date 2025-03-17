@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 set -e -u -o pipefail
 
 if [ -z "$FOAM_USER_APPBIN" ]; then
