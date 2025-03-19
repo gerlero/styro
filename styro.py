@@ -27,7 +27,7 @@ else:
 import requests
 import typer
 
-__version__ = "0.1.13"
+__version__ = "0.1.14"
 
 app = typer.Typer(help=__doc__, add_completion=False)
 
