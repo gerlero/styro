@@ -391,7 +391,7 @@ def _resolve(
                 del resolved[pkg]
                 unresolved[pkg] = True
 
-    typer.echo(f"📦 Successfully resolved {len(packages)} package(s).")
+    typer.echo(f"📦 Successfully resolved {len(resolved)} package(s).")
 
     return resolved
 
