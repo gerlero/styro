@@ -12,8 +12,9 @@ import subprocess
 import sys
 import tarfile
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Deque, List, Optional
+from typing import Any, Deque, Dict, List, Optional, Union
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -32,10 +33,14 @@ app = typer.Typer(help=__doc__, add_completion=False)
 
 
 def _run(
-    cmd: List[str], *, cwd: Optional[Path] = None, lines: int = 4
+    cmd: List[str],
+    *,
+    cwd: Optional[Path] = None,
+    env: Optional[Dict[str, str]] = None,
+    lines: int = 4,
 ) -> subprocess.CompletedProcess:
     with subprocess.Popen(
-        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     ) as proc:
         if sys.version_info >= (3, 8):
             display_cmd = shlex.join(cmd)
@@ -229,6 +234,181 @@ def _check_version_compatibility(specs: List[str]) -> None:
         )
 
 
+def _get_build_steps(build: Optional[Union[str, List[str]]]) -> List[str]:
+    if build is None:
+        build = "wmake"
+
+    if build == "wmake":
+        build = ["wmake all -j"]
+    elif build == "cmake":
+        typer.echo(
+            "🛑 Error: CMake build system is not supported yet.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    else:
+        typer.echo(
+            f"🛑 Error: Unsupported build system: {build}.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    return build
+
+
+@dataclass
+class _ResolvedPackage:
+    requires: List[str]
+    repo_url: Optional[str]
+    build: Optional[List[str]]
+
+
+def _resolve(
+    packages: List[str], *, installed: Dict[str, Any], upgrade: bool
+) -> Dict[str, _ResolvedPackage]:
+    platform_path = _platform_path()
+    unresolved = dict.fromkeys(packages, upgrade)
+    resolved: Dict[str, _ResolvedPackage] = {}
+
+    while unresolved:
+        package = next(iter(unresolved))
+        upgrade = unresolved.pop(package)
+        typer.echo(f"🔎 Resolving {package}...")
+
+        if package == "styro":
+            if (
+                upgrade
+                and _is_managed_installation()
+                and _check_for_new_version(verbose=False)
+            ):
+                typer.echo(
+                    "🛑 Error: This is a managed installation of styro.",
+                    err=True,
+                )
+                _print_upgrade_instruction()
+                raise typer.Exit(code=1)
+
+            resolved["styro"] = _ResolvedPackage(requires=[], repo_url=None, build=None)
+            continue
+
+        if package in installed["packages"] and not upgrade:
+            resolved[package] = _ResolvedPackage(
+                requires=installed["packages"][package].get("requires", []),
+                repo_url=None,
+                build=None,
+            )
+            continue
+
+        try:
+            response = requests.get(
+                f"https://raw.githubusercontent.com/exasim-project/opi/refs/heads/main/pkg/{package}/metadata.json",
+                timeout=10,
+            )
+        except Exception as e:
+            typer.echo(
+                f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
+            )
+            raise typer.Exit(code=1) from e
+
+        if response.status_code == 404:  # noqa: PLR2004
+            typer.echo(
+                f"🛑 Error: Package '{package}' not found in the OpenFOAM Package Index (OPI).\nSee https://github.com/exasim-project/opi for more information.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        try:
+            response.raise_for_status()
+
+            metadata = response.json()
+
+            repo_url = metadata["repo"]
+        except Exception as e:
+            typer.echo(
+                f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
+            )
+            raise typer.Exit(code=1) from e
+
+        if not repo_url.startswith("https://"):
+            typer.echo(
+                f"🛑 Error: Unsupported non-HTTPS repository indexed for {package}: {repo_url}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        _check_version_compatibility(metadata.get("version", []))
+        build = _get_build_steps(metadata.get("build"))
+
+        if package in installed["packages"] and upgrade:
+            typer.echo(f"🔁 Checking for updates of {package}...")
+
+            pkg_path = platform_path / "styro" / "pkg" / package
+
+            with contextlib.suppress(FileNotFoundError, subprocess.CalledProcessError):
+                _run(
+                    ["git", "remote", "set-url", "origin", repo_url],
+                    cwd=pkg_path,
+                )
+                default_branch = (
+                    _run(
+                        ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
+                        cwd=pkg_path,
+                    )
+                    .stdout.strip()
+                    .split("/")[-1]
+                )
+                _run(["git", "fetch", "origin"], cwd=pkg_path)
+
+                if not _run(
+                    ["git", "rev-list", f"origin/{default_branch}..{default_branch}"],
+                    cwd=pkg_path,
+                ).stdout.strip():
+                    resolved[package] = _ResolvedPackage(
+                        requires=metadata.get("requires", []),
+                        repo_url=repo_url,
+                        build=None,
+                    )
+                    continue
+
+        resolved[package] = _ResolvedPackage(
+            requires=metadata.get("requires", []),
+            repo_url=repo_url,
+            build=build,
+        )
+
+        dependencies = set(resolved[package].requires)
+        dependents = {
+            pkg
+            for pkg in installed["packages"]
+            if package in installed["packages"][pkg].get("requires", [])
+        }
+
+        for pkg in set.union(dependents, dependencies):
+            assert pkg != package
+            if pkg not in resolved:
+                unresolved[pkg] = upgrade
+            if upgrade and resolved[pkg].repo_url is None:
+                del resolved[pkg]
+                unresolved[pkg] = True
+
+    typer.echo(f"📦 Successfully resolved {len(packages)} package(s).")
+
+    return resolved
+
+
+def _sort(packages: Dict[str, _ResolvedPackage]) -> Dict[str, _ResolvedPackage]:
+    unsorted = dict(packages)
+    sorted_: Dict[str, _ResolvedPackage] = {}
+
+    while unsorted:
+        for package in list(unsorted):
+            if all(req in sorted_ for req in unsorted[package].requires):
+                sorted_[package] = unsorted[package]
+                del unsorted[package]
+
+    return sorted_
+
+
 @app.command()
 def install(packages: List[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
@@ -239,91 +419,13 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
         _check_for_new_version(verbose=True)
 
     with _installed(write=True) as installed:
-        repo_urls: List[Optional[str]] = []
-        builds: List[Optional[str]] = []
-        for package in packages:
-            typer.echo(f"🔁 Resolving {package}...")
-
+        for package, resolved in _sort(
+            _resolve(packages, installed=installed, upgrade=upgrade)
+        ).items():
             if package == "styro":
-                repo_urls.append(None)
-                builds.append(None)
-                if (
-                    upgrade
-                    and _is_managed_installation()
-                    and _check_for_new_version(verbose=False)
-                ):
-                    typer.echo(
-                        "🛑 Error: This is a managed installation of styro.",
-                        err=True,
-                    )
-                    _print_upgrade_instruction()
-                    raise typer.Exit(code=1)
-                continue
-
-            if package in installed["packages"] and not upgrade:
-                repo_urls.append(None)
-                builds.append(None)
-                continue
-
-            try:
-                response = requests.get(
-                    f"https://raw.githubusercontent.com/exasim-project/opi/refs/heads/main/pkg/{package}/metadata.json",
-                    timeout=10,
-                )
-            except Exception as e:
-                typer.echo(
-                    f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
-                )
-                raise typer.Exit(code=1) from e
-
-            if response.status_code == 404:  # noqa: PLR2004
-                typer.echo(
-                    f"🛑 Error: Package '{package}' not found in the OpenFOAM Package Index (OPI).\nSee https://github.com/exasim-project/opi for more information.",
-                    err=True,
-                )
-                raise typer.Exit(code=1)
-
-            try:
-                response.raise_for_status()
-
-                metadata = response.json()
-
-                _check_version_compatibility(metadata.get("version", []))
-
-                repo_url = metadata["repo"]
-            except Exception as e:
-                typer.echo(
-                    f"🛑 Error: Failed to resolve package '{package}': {e}", err=True
-                )
-                raise typer.Exit(code=1) from e
-
-            if not repo_url.startswith("https://"):
-                typer.echo(
-                    f"🛑 Error: Unsupported non-HTTPS repository indexed for {package}: {repo_url}",
-                    err=True,
-                )
-                raise typer.Exit(code=1)
-
-            repo_urls.append(repo_url)
-
-            build = metadata.get("build", "wmake")
-            if build == "wmake":
-                build = ["wmake all -j"]
-            elif build == "cmake":
-                typer.echo(
-                    f"🛑 Error: CMake build system (required by {package}) is not supported yet.",
-                    err=True,
-                )
-                raise typer.Exit(code=1)
-
-            builds.append(build)
-
-        typer.echo(f"📦 Successfully resolved {len(repo_urls)} package(s).")
-
-        for package, repo_url, build in zip(packages, repo_urls, builds):
-            if package == "styro":
-                assert repo_url is None
-                assert build is None
+                assert resolved.repo_url is None
+                assert resolved.build is None
+                assert not resolved.requires
 
                 if not upgrade:
                     typer.echo("✋ Package 'styro' is already installed.")
@@ -366,63 +468,45 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 typer.echo("✅ Package 'styro' upgraded successfully.")
                 continue
 
-            if repo_url is None:
-                assert not upgrade
-                assert build is None
+            if resolved.repo_url is None:
                 typer.echo(f"✋ Package '{package}' is already installed.")
                 continue
 
-            pkg_path = platform_path / "styro" / "pkg" / package
-            if (pkg_path / ".git").exists():
-                typer.echo(f"⏬ Updating {package}...")
-                try:
-                    _run(
-                        ["git", "remote", "set-url", "origin", repo_url],
-                        cwd=pkg_path,
-                    )
-                    default_branch = (
-                        _run(
-                            ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
-                            cwd=pkg_path,
-                        )
-                        .stdout.strip()
-                        .split("/")[-1]
-                    )
-                    _run(
-                        ["git", "checkout", default_branch],
-                        cwd=pkg_path,
-                    )
-                    _run(["git", "fetch", "origin"], cwd=pkg_path)
-                    _run(
-                        ["git", "reset", "--hard", f"origin/{default_branch}"],
-                        cwd=pkg_path,
-                    )
-                    _run(
-                        ["git", "pull"],
-                        cwd=pkg_path,
-                    )
-                except subprocess.CalledProcessError:
-                    shutil.rmtree(pkg_path, ignore_errors=True)
-                    typer.echo(
-                        f"⚠️ Warning: failed to update package '{package}'. Redownloading...",
-                        err=True,
-                    )
+            if resolved.build is None:
+                typer.echo(f"✋ Package '{package}' is already up-to-date.")
+                continue
 
-            if not (pkg_path / ".git").exists():
+            if package not in installed["packages"]:
                 typer.echo(f"⏬ Downloading {package}...")
+            else:
+                typer.echo(f"⏩ Updating {package}...")
+
+            pkg_path = platform_path / "styro" / "pkg" / package
+
+            try:
+                default_branch = (
+                    _run(
+                        ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
+                        cwd=pkg_path,
+                    )
+                    .stdout.strip()
+                    .split("/")[-1]
+                )
+                _run(
+                    ["git", "checkout", default_branch],
+                    cwd=pkg_path,
+                )
+                _run(
+                    ["git", "reset", "--hard", f"origin/{default_branch}"],
+                    cwd=pkg_path,
+                )
+            except (FileNotFoundError, subprocess.CalledProcessError):
                 shutil.rmtree(pkg_path, ignore_errors=True)
                 pkg_path.mkdir(parents=True)
-                try:
-                    _run(
-                        ["git", "clone", repo_url, "."],
-                        cwd=pkg_path,
-                    )
-                except subprocess.CalledProcessError as e:
-                    typer.echo(
-                        f"🛑 Error: failed to download package '{package}'\n{e.stderr}",
-                        err=True,
-                    )
-                    raise typer.Exit(code=1) from e
+                _run(
+                    ["git", "clone", resolved.repo_url, "."],
+                    cwd=pkg_path,
+                )
 
             sha = _run(
                 ["git", "rev-parse", "HEAD"],
@@ -430,11 +514,6 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
             ).stdout.strip()
 
             if package in installed["packages"]:
-                assert upgrade
-                if sha == installed["packages"][package]["sha"]:
-                    typer.echo(f"✋ Package '{package}' is already up-to-date.")
-                    continue
-
                 typer.echo(f"🗑️ Uninstalling {package}...")
 
                 for app in installed["packages"][package]["apps"]:
@@ -479,11 +558,19 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
             except FileNotFoundError:
                 current_libs = {}
 
-            for cmd in build:
+            if resolved.requires:
+                assert all(req in installed["packages"] for req in resolved.requires)
+                env = os.environ.copy()
+                env["OPI_DEPENDENCIES"] = str(pkg_path.parent)
+            else:
+                env = None
+
+            for cmd in resolved.build:
                 try:
                     _run(
                         ["/bin/bash", "-c", cmd],
                         cwd=pkg_path,
+                        env=env,
                     )
                 except subprocess.CalledProcessError as e:
                     typer.echo(
@@ -556,6 +643,8 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
                 "apps": [app.name for app in new_apps],
                 "libs": [lib.name for lib in new_libs],
             }
+            if resolved.requires:
+                installed["packages"][package]["requires"] = resolved.requires
 
             typer.echo(f"✅ Package '{package}' installed successfully.")
 
