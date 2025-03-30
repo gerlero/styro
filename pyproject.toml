@@ -59,13 +59,13 @@ Homepage = "https://github.com/gerlero/styro"
 Repository = "https://github.com/gerlero/styro"
 
 [project.scripts]
-styro = "styro:app"
+styro = "styro.__main__:app"
 
 [tool.hatch.version]
-path = "styro.py"
+path = "styro/__init__.py"
 
 [tool.mypy]
-modules = ["styro"]
+packages = ["styro"]
 
 [tool.ruff.lint]
 extend-select = ["ALL"]
