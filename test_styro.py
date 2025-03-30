@@ -3,7 +3,8 @@ import os
 import pytest
 from typer.testing import CliRunner
 
-from styro import __version__, app
+from styro import __version__
+from styro.__main__ import app
 
 runner = CliRunner()
 

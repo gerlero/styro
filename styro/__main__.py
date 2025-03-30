@@ -6,15 +6,13 @@ import io
 import json
 import os
 import platform
-import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
-from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -27,58 +25,10 @@ else:
 import requests
 import typer
 
-__version__ = "0.1.14"
+from . import __version__
+from ._subprocess import run
 
 app = typer.Typer(help=__doc__, add_completion=False)
-
-
-def _run(
-    cmd: List[str],
-    *,
-    cwd: Optional[Path] = None,
-    env: Optional[Dict[str, str]] = None,
-    lines: int = 4,
-) -> subprocess.CompletedProcess:
-    with subprocess.Popen(
-        cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    ) as proc:
-        if sys.version_info >= (3, 8):
-            display_cmd = shlex.join(cmd)
-        else:
-            display_cmd = " ".join(shlex.quote(arg) for arg in cmd)
-
-        typer.echo(f"==> \033[1m{display_cmd[:64]}\033[0m")
-
-        out: Deque[str] = deque(maxlen=lines)
-        stdout = ""
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            stdout += line
-
-            for _ in range(len(out)):
-                typer.echo("\033[1A\x1b[2K", nl=False)
-
-            out.append(line.rstrip())
-
-            for ln in out:
-                typer.echo(f"\033[90m{ln[:64]}\033[0m")
-
-        for _ in range(len(out) + 1):
-            typer.echo("\033[1A\x1b[2K", nl=False)
-
-        assert proc.stderr is not None
-        stderr = proc.stderr.read().strip()
-
-        proc.wait()
-
-        if proc.returncode != 0:
-            raise subprocess.CalledProcessError(
-                returncode=proc.returncode, cmd=cmd, output=stdout, stderr=stderr
-            )
-
-        return subprocess.CompletedProcess(
-            args=cmd, returncode=proc.returncode, stdout=stdout, stderr=stderr
-        )
 
 
 def _platform_path() -> Path:
@@ -345,21 +295,21 @@ def _resolve(
             pkg_path = platform_path / "styro" / "pkg" / package
 
             with contextlib.suppress(FileNotFoundError, subprocess.CalledProcessError):
-                _run(
+                run(
                     ["git", "remote", "set-url", "origin", repo_url],
                     cwd=pkg_path,
                 )
                 default_branch = (
-                    _run(
+                    run(
                         ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
                         cwd=pkg_path,
                     )
                     .stdout.strip()
                     .split("/")[-1]
                 )
-                _run(["git", "fetch", "origin"], cwd=pkg_path)
+                run(["git", "fetch", "origin"], cwd=pkg_path)
 
-                if not _run(
+                if not run(
                     ["git", "rev-list", f"origin/{default_branch}..{default_branch}"],
                     cwd=pkg_path,
                 ).stdout.strip():
@@ -485,30 +435,30 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
             try:
                 default_branch = (
-                    _run(
+                    run(
                         ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
                         cwd=pkg_path,
                     )
                     .stdout.strip()
                     .split("/")[-1]
                 )
-                _run(
+                run(
                     ["git", "checkout", default_branch],
                     cwd=pkg_path,
                 )
-                _run(
+                run(
                     ["git", "reset", "--hard", f"origin/{default_branch}"],
                     cwd=pkg_path,
                 )
             except (FileNotFoundError, subprocess.CalledProcessError):
                 shutil.rmtree(pkg_path, ignore_errors=True)
                 pkg_path.mkdir(parents=True)
-                _run(
+                run(
                     ["git", "clone", resolved.repo_url, "."],
                     cwd=pkg_path,
                 )
 
-            sha = _run(
+            sha = run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=pkg_path,
             ).stdout.strip()
@@ -567,7 +517,7 @@ def install(packages: List[str], *, upgrade: bool = False) -> None:
 
             for cmd in resolved.build:
                 try:
-                    _run(
+                    run(
                         ["/bin/bash", "-c", cmd],
                         cwd=pkg_path,
                         env=env,
