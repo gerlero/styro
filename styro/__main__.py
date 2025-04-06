@@ -1,6 +1,5 @@
 """A community package manager for OpenFOAM."""
 
-import asyncio
 import sys
 from typing import List
 
@@ -22,30 +21,33 @@ app = typer.Typer(help=__doc__, add_completion=False)
 @async_to_sync
 async def install(packages: List[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
+    pkgs = {_Package(pkg) for pkg in packages}
+
+    if not upgrade or _Package("styro") not in pkgs:
+        await check_for_new_version(verbose=True)
+
     with _Package.lock(write=True):
-        pkgs = [_Package(pkg) for pkg in packages]
+        for pkg in list(pkgs):
+            if pkg.is_installed() and not upgrade:
+                typer.echo(f"✋ Package {pkg.name} is already installed.")
+                pkgs.remove(pkg)
 
-        if not upgrade or _Package("styro") not in pkgs:
-            await check_for_new_version(verbose=True)
-
-        await asyncio.gather(
-            *(pkg.resolve() for pkg in pkgs if not pkg.is_installed() or upgrade),
-        )
-
-        await asyncio.gather(*(pkg.install() for pkg in pkgs))
+        await _Package.install_all(pkgs)
 
 
 @app.command()
 @async_to_sync
 async def uninstall(packages: List[str]) -> None:
     """Uninstall OpenFOAM packages."""
+    pkgs = {_Package(pkg) for pkg in packages}
+
     with _Package.lock(write=True):
-        for package in packages:
-            _Package(package).uninstall()
+        await _Package.uninstall_all(pkgs)
 
 
 @app.command()
-def freeze() -> None:
+@async_to_sync
+async def freeze() -> None:
     """List installed OpenFOAM packages."""
     with _Package.lock():
         for pkg in _Package.installed():

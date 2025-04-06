@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -64,12 +64,9 @@ def _openfoam_version() -> int:
 class _Package:
     _installed: ClassVar[Optional[Dict[str, Any]]] = None
     _instances: ClassVar[Dict[str, "_Package"]] = {}
-    _build_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
 
     name: str
     _metadata: Optional[Dict[str, Any]]
-    _lock: asyncio.Lock
-    to_install: bool
 
     @staticmethod
     @contextlib.contextmanager
@@ -110,6 +107,65 @@ class _Package:
         assert _Package._installed is not None
         return [_Package(name) for name in _Package._installed["packages"]]
 
+    @staticmethod
+    async def _resolve_all(
+        pkgs: Set["_Package"],
+    ) -> Set["_Package"]:
+        resolved: Set[_Package] = set()
+        return {
+            pkg
+            for pkgs in await asyncio.gather(
+                *(pkg.resolve(_resolved=resolved) for pkg in pkgs),
+            )
+            for pkg in pkgs
+        }
+
+    @staticmethod
+    def _sort_for_install(pkgs: Set["_Package"]) -> List["_Package"]:
+        unsorted = set(pkgs)
+        sorted_: List[_Package] = []
+
+        while unsorted:
+            for pkg in list(unsorted):
+                if all(dep not in pkgs or dep in sorted_ for dep in pkg.dependencies()):
+                    sorted_.append(pkg)
+                    unsorted.remove(pkg)
+
+        assert len(sorted_) == len(pkgs)
+        return sorted_
+
+    @staticmethod
+    async def install_all(pkgs: Set["_Package"]) -> None:
+        to_install = _Package._sort_for_install(await _Package._resolve_all(pkgs))
+
+        await asyncio.gather(
+            *(
+                pkg.uninstall(_force=True, _keep_pkg=True)
+                for pkg in to_install
+                if pkg.is_installed()
+            ),
+        )
+
+        for pkg in to_install:
+            await pkg.install(_deps=False)
+
+    @staticmethod
+    async def uninstall_all(pkgs: Set["_Package"]) -> None:
+        dependents = set()
+        for pkg in pkgs:
+            dependents.update(pkg.installed_dependents())
+        dependents -= pkgs
+        if dependents:
+            typer.echo(
+                f"🛑 Error: Cannot uninstall {','.join([pkg.name for pkg in pkgs])}: required by {','.join([dep.name for dep in dependents])}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        await asyncio.gather(
+            *(pkg.uninstall(_force=True) for pkg in pkgs),
+        )
+
     def __new__(cls, name: str) -> "_Package":
         name = name.lower().replace("_", "-")
 
@@ -120,8 +176,6 @@ class _Package:
         cls._instances[name] = instance
         instance.name = name
         instance._metadata = None
-        instance._lock = asyncio.Lock()
-        instance.to_install = False
         return instance
 
     def _build_steps(self) -> List[str]:
@@ -193,99 +247,91 @@ class _Package:
                 err=True,
             )
 
-    def _resolved_dependencies(self) -> List["_Package"]:
+    def dependencies(self) -> Set["_Package"]:
         assert self._metadata is not None
-        return [_Package(name) for name in self._metadata.get("requires", [])]
+        return {_Package(name) for name in self._metadata.get("requires", [])}
 
-    def _installed_dependents(self) -> List["_Package"]:
+    def installed_dependents(self) -> Set["_Package"]:
         assert self._installed is not None
-        return [
+        return {
             _Package(name)
             for name, data in self._installed["packages"].items()
             if self.name in data.get("requires", [])
-        ]
+        }
 
-    async def resolve(self, *, force_reinstall: bool = False) -> None:
+    async def resolve(
+        self,
+        *,
+        _force_reinstall: bool = False,
+        _resolved: Optional[Set["_Package"]] = None,
+    ) -> Set["_Package"]:
         assert self._installed is not None
-        async with self._lock:
-            if self._metadata is not None and (self.to_install or not force_reinstall):
-                return
+        if _resolved is None:
+            _resolved = set()
+        elif self in _resolved:
+            return set()
 
-            if self._metadata is None:
-                typer.echo(f"🔍 Resolving {self.name}...")
+        _resolved.add(self)
 
-                try:
-                    try:
-                        async with aiohttp.ClientSession(
-                            raise_for_status=True
-                        ) as session, session.get(
-                            f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
-                        ) as response:
-                            self._metadata = await response.json(
-                                content_type="text/plain"
-                            )
-                    except aiohttp.ClientError as e:
-                        if response.status == 404:  # noqa: PLR2004
-                            typer.echo(
-                                f"🛑 Error: Package '{self.name}' not found in the OpenFOAM Package Index (OPI).\nSee https://github.com/exasim-project/opi for more information.",
-                                err=True,
-                            )
+        typer.echo(f"🔍 Resolving {self.name}...")
 
-                            raise typer.Exit(code=1) from e
-                        raise
-                except Exception as e:
-                    typer.echo(
-                        f"🛑 Error: Failed to resolve package '{self.name}': {e}",
-                        err=True,
-                    )
-                    raise typer.Exit(code=1) from e
+        if self._metadata is None:
+            try:
+                async with aiohttp.ClientSession(
+                    raise_for_status=True
+                ) as session, session.get(
+                    f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
+                ) as response:
+                    self._metadata = await response.json(content_type="text/plain")
+            except Exception as e:
+                typer.echo(
+                    f"🛑 Error: Failed to resolve package '{self.name}': {e}",
+                    err=True,
+                )
+                raise typer.Exit(code=1) from e
 
-                self._check_compatibility()
-                self._build_steps()
+            self._check_compatibility()
+            self._build_steps()
 
-                if self.is_installed() and not force_reinstall:
-                    sha = await fetch(self._pkg_path, self._metadata["repo"])
-                    if (
-                        sha is not None
-                        and sha == self._installed["packages"][self.name]["sha"]
-                    ):
-                        return
+            if self.is_installed() and not _force_reinstall:
+                sha = await fetch(self._pkg_path, self._metadata["repo"])
+                if (
+                    sha is not None
+                    and sha == self._installed["packages"][self.name]["sha"]
+                ):
+                    typer.echo(f"✋ Package '{self.name}' is already up-to-date.")
+                    return set()
 
-            self.to_install = True
+        ret = {self}
 
-        await asyncio.gather(
-            *(dep.resolve() for dep in self._resolved_dependencies()),
+        dependencies = await asyncio.gather(
+            *(dep.resolve(_resolved=_resolved) for dep in self.dependencies()),
             *(
-                dep.resolve(force_reinstall=True)
-                for dep in self._installed_dependents()
+                dep.resolve(_force_reinstall=True, _resolved=_resolved)
+                for dep in self.installed_dependents()
             ),
         )
+        for deps in dependencies:
+            ret.update(deps)
+
+        return ret
 
     def is_installed(self) -> bool:
         assert self._installed is not None
-        if self.name == "styro":
-            return True
         return self.name in self._installed["packages"]
 
     @property
     def _pkg_path(self) -> Path:
         return _platform_path() / "styro" / "pkg" / self.name
 
-    async def install(self) -> None:
+    async def install(self, *, _deps: bool = True) -> None:
         assert self._installed is not None
-        async with self._lock:
-            if not self.to_install:
-                if self._metadata is not None:
-                    typer.echo(f"✋ Package '{self.name}' is already up-to-date.")
-                else:
-                    typer.echo(f"✋ Package '{self.name}' is already installed.")
-                return
+
+        if _deps:
+            await self.install_all({self})
+            return
 
         assert self._metadata is not None
-
-        await asyncio.gather(
-            *(dep.install() for dep in self._resolved_dependencies()),
-        )
 
         if self.is_installed():
             typer.echo(f"⏩ Updating {self.name}...")
@@ -294,102 +340,94 @@ class _Package:
 
         sha = await clone(self._pkg_path, self._metadata["repo"])
 
-        async with self._lock:
-            if self.is_installed():
-                self.uninstall(keep_pkg=True)
+        assert not self.is_installed()
 
-            assert not self.is_installed()
+        typer.echo(f"⏳ Installing {self.name}...")
 
-            typer.echo(f"⏳ Installing {self.name}...")
+        installed_apps = {
+            app
+            for p in self._installed["packages"]
+            for app in self._installed["packages"][p].get("apps", [])
+        }
+        installed_libs = {
+            lib
+            for p in self._installed["packages"]
+            for lib in self._installed["packages"][p].get("libs", [])
+        }
 
-            installed_apps = {
-                app
-                for p in self._installed["packages"]
-                for app in self._installed["packages"][p].get("apps", [])
+        try:
+            current_apps = {
+                f: f.stat().st_mtime
+                for f in (_platform_path() / "bin").iterdir()
+                if f.is_file()
             }
-            installed_libs = {
-                lib
-                for p in self._installed["packages"]
-                for lib in self._installed["packages"][p].get("libs", [])
+        except FileNotFoundError:
+            current_apps = {}
+        try:
+            current_libs = {
+                f: f.stat().st_mtime
+                for f in (_platform_path() / "lib").iterdir()
+                if f.is_file()
             }
+        except FileNotFoundError:
+            current_libs = {}
 
+        if self.dependencies():
+            env = os.environ.copy()
+            env["OPI_DEPENDENCIES"] = str(self._pkg_path.parent)
+        else:
+            env = None
+
+        for cmd in self._build_steps():
             try:
-                current_apps = {
-                    f: f.stat().st_mtime
-                    for f in (_platform_path() / "bin").iterdir()
-                    if f.is_file()
-                }
-            except FileNotFoundError:
-                current_apps = {}
-            try:
-                current_libs = {
-                    f: f.stat().st_mtime
-                    for f in (_platform_path() / "lib").iterdir()
-                    if f.is_file()
-                }
-            except FileNotFoundError:
-                current_libs = {}
+                await run(
+                    ["/bin/bash", "-c", cmd],
+                    cwd=self._pkg_path,
+                    env=env,
+                )
+            except subprocess.CalledProcessError as e:
+                typer.echo(
+                    f"Error: failed to build package '{self.name}'\n{e.stderr}",
+                    err=True,
+                )
 
-            if self._resolved_dependencies():
-                assert all(dep.is_installed() for dep in self._resolved_dependencies())
-                env = os.environ.copy()
-                env["OPI_DEPENDENCIES"] = str(self._pkg_path.parent)
-            else:
-                env = None
-
-            for cmd in self._build_steps():
                 try:
-                    async with self._build_lock:
-                        await run(
-                            ["/bin/bash", "-c", cmd],
-                            cwd=self._pkg_path,
-                            env=env,
+                    new_apps = sorted(
+                        f
+                        for f in (_platform_path() / "bin").iterdir()
+                        if f.is_file()
+                        and f not in installed_apps
+                        and (
+                            f not in current_apps or f.stat().st_mtime > current_apps[f]
                         )
-                except subprocess.CalledProcessError as e:
-                    typer.echo(
-                        f"Error: failed to build package '{self.name}'\n{e.stderr}",
-                        err=True,
                     )
+                except FileNotFoundError:
+                    new_apps = []
 
-                    try:
-                        new_apps = sorted(
-                            f
-                            for f in (_platform_path() / "bin").iterdir()
-                            if f.is_file()
-                            and f not in installed_apps
-                            and (
-                                f not in current_apps
-                                or f.stat().st_mtime > current_apps[f]
-                            )
+                try:
+                    new_libs = sorted(
+                        f
+                        for f in (_platform_path() / "lib").iterdir()
+                        if f.is_file()
+                        and f not in installed_libs
+                        and (
+                            f not in current_libs or f.stat().st_mtime > current_libs[f]
                         )
-                    except FileNotFoundError:
-                        new_apps = []
+                    )
+                except FileNotFoundError:
+                    new_libs = []
 
-                    try:
-                        new_libs = sorted(
-                            f
-                            for f in (_platform_path() / "lib").iterdir()
-                            if f.is_file()
-                            and f not in installed_libs
-                            and (
-                                f not in current_libs
-                                or f.stat().st_mtime > current_libs[f]
-                            )
-                        )
-                    except FileNotFoundError:
-                        new_libs = []
+                for app in new_apps:
+                    with contextlib.suppress(FileNotFoundError):
+                        app.unlink()
 
-                    for app in new_apps:
-                        with contextlib.suppress(FileNotFoundError):
-                            app.unlink()
+                for lib in new_libs:
+                    with contextlib.suppress(FileNotFoundError):
+                        lib.unlink()
 
-                    for lib in new_libs:
-                        with contextlib.suppress(FileNotFoundError):
-                            lib.unlink()
+                shutil.rmtree(self._pkg_path, ignore_errors=True)
 
-                    shutil.rmtree(self._pkg_path, ignore_errors=True)
-
-                    raise typer.Exit(code=1) from e
+                raise typer.Exit(code=1) from e
 
             try:
                 new_apps = sorted(
@@ -414,12 +452,10 @@ class _Package:
                 "apps": [app.name for app in new_apps],
                 "libs": [lib.name for lib in new_libs],
             }
-            if self._resolved_dependencies():
+            if self.dependencies():
                 self._installed["packages"][self.name]["requires"] = [
-                    dep.name for dep in self._resolved_dependencies()
+                    dep.name for dep in self.dependencies()
                 ]
-
-            self.to_install = False
 
             typer.echo(f"✅ Package '{self.name}' installed successfully.")
 
@@ -433,18 +469,25 @@ class _Package:
                 for app in new_apps:
                     typer.echo(f"  {app.name}")
 
-        await asyncio.gather(
-            *(dep.install() for dep in self._installed_dependents() if dep.to_install),
-        )
+    async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
+        if not _force:
+            assert not _keep_pkg
+            await self.uninstall_all({self})
 
-    def uninstall(self, *, keep_pkg: bool = False) -> None:
         assert self._installed is not None
-        if self.name not in self._installed["packages"]:
+        if not self.is_installed():
             typer.echo(
                 f"⚠️ Warning: skipping package '{self.name}' as it is not installed.",
                 err=True,
             )
             return
+
+        if not _force and self.installed_dependents():
+            typer.echo(
+                f"🛑 Error: Cannot uninstall {self.name}: required by {','.join([dep.name for dep in self.installed_dependents()])}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
         typer.echo(f"⏳ Uninstalling {self.name}...")
 
@@ -456,7 +499,7 @@ class _Package:
             with contextlib.suppress(FileNotFoundError):
                 (_platform_path() / "lib" / lib).unlink()
 
-        if not keep_pkg:
+        if not _keep_pkg:
             shutil.rmtree(
                 self._pkg_path,
                 ignore_errors=True,
@@ -466,85 +509,83 @@ class _Package:
 
         typer.echo(f"🗑️ Package '{self.name}' uninstalled successfully.")
 
+    def __repr__(self) -> str:
+        return f"Package({self.name!r})"
+
+    def __str__(self) -> str:
+        return self.name
+
 
 class _Styro(_Package):
     def is_installed(self) -> bool:
         return True
 
-    async def resolve(self, *, force_reinstall: bool = False) -> None:
-        assert not force_reinstall
-        async with self._lock:
-            if self._metadata is not None:
-                return
+    async def resolve(
+        self,
+        *,
+        _force_reinstall: bool = False,
+        _resolved: Optional[Set["_Package"]] = None,
+    ) -> Set["_Package"]:
+        typer.echo("🔍 Resolving styro..")
 
-            typer.echo("🔍 Resolving styro..")
-
+        if self._metadata is not None:
             self._metadata = {}
 
-            if not await check_for_new_version(verbose=False):
-                return
+        if not await check_for_new_version(verbose=False):
+            return set()
 
-            if is_managed_installation():
-                typer.echo(
-                    "🛑 Error: This is a managed installation of styro.",
-                    err=True,
-                )
-                print_upgrade_instruction()
-                raise typer.Exit(code=1)
+        if is_managed_installation():
+            typer.echo(
+                "🛑 Error: This is a managed installation of styro.",
+                err=True,
+            )
+            print_upgrade_instruction()
+            raise typer.Exit(code=1)
 
-            self.to_install = True
+        return {self}
 
-    async def install(self) -> None:
-        async with self._lock:
-            if not self.to_install:
-                if self._metadata is not None:
-                    typer.echo("✋ Package 'styro' is already up-to-date.")
-                else:
-                    typer.echo("✋ Package 'styro' is already installed.")
-                return
+    async def install(self, *, _deps: bool = True) -> None:
+        assert not is_managed_installation()
 
-            assert not is_managed_installation()
+        typer.echo("⏬ Downloading styro...")
+        try:
+            async with aiohttp.ClientSession(
+                raise_for_status=True
+            ) as session, session.get(
+                f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
+            ) as response:
+                contents = await response.read()
+        except Exception as e:
+            typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
+            raise typer.Exit(code=1) from e
+        typer.echo("⏳ Upgrading styro...")
+        try:
+            with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
+                tar.extract("styro", path=Path(sys.executable).parent)
+        except Exception as e:
+            typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
+            raise typer.Exit(code=1) from e
+        typer.echo("✅ Package 'styro' upgraded successfully.")
 
-            typer.echo("⏬ Downloading styro...")
-            try:
-                async with aiohttp.ClientSession(
-                    raise_for_status=True
-                ) as session, session.get(
-                    f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
-                ) as response:
-                    contents = await response.read()
-            except Exception as e:
-                typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
-                raise typer.Exit(code=1) from e
-            typer.echo("⏳ Upgrading styro...")
-            try:
-                with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
-                    tar.extract("styro", path=Path(sys.executable).parent)
-            except Exception as e:
-                typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
-                raise typer.Exit(code=1) from e
-            typer.echo("✅ Package 'styro' upgraded successfully.")
-            return
+    def dependencies(self) -> Set[_Package]:
+        return set()
 
-    def _resolved_dependencies(self) -> List[_Package]:
-        raise NotImplementedError
+    def installed_dependents(self) -> Set[_Package]:
+        return {self}
 
-    def _installed_dependents(self) -> List[_Package]:
-        raise NotImplementedError
-
-    def uninstall(self, *, keep_pkg: bool = False) -> None:  # noqa: ARG002
+    async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
         typer.echo(
-            "🛑 Error: styro cannot be uninstalled using styro.",
+            "🛑 Error: styro cannot be uninstalled this way.",
             err=True,
         )
         if is_managed_installation():
             typer.echo(
-                "Use your package manager (e.g. pip) to uninstall styro.",
+                "💡 Use your package manager (e.g. pip) to uninstall styro.",
                 err=True,
             )
         else:
             typer.echo(
-                "Delete the styro binary in $FOAM_USER_APPBIN to uninstall.",
+                "💡 Delete the 'styro' binary in $FOAM_USER_APPBIN to uninstall.",
                 err=True,
             )
         raise typer.Exit(code=1)
