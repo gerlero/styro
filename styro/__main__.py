@@ -1,7 +1,8 @@
 """A community package manager for OpenFOAM."""
 
+from __future__ import annotations
+
 import sys
-from typing import List
 
 if sys.version_info >= (3, 9):
     from typing import Annotated
@@ -19,7 +20,7 @@ app = typer.Typer(help=__doc__, add_completion=False)
 
 @app.command()
 @async_to_sync
-async def install(packages: List[str], *, upgrade: bool = False) -> None:
+async def install(packages: list[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
     pkgs = {Package(pkg) for pkg in packages}
 
@@ -32,7 +33,7 @@ async def install(packages: List[str], *, upgrade: bool = False) -> None:
 
 @app.command()
 @async_to_sync
-async def uninstall(packages: List[str]) -> None:
+async def uninstall(packages: list[str]) -> None:
     """Uninstall OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
 
