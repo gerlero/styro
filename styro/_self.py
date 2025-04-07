@@ -10,6 +10,7 @@ import aiohttp
 import typer
 
 from . import Package, __version__
+from ._status import Status
 
 
 def is_managed_installation() -> bool:
@@ -31,11 +32,14 @@ def print_upgrade_instruction() -> None:
 
 async def check_for_new_version(*, verbose: bool = True) -> bool:
     try:
-        async with aiohttp.ClientSession(raise_for_status=True) as session, session.get(
-            "https://api.github.com/repos/gerlero/styro/releases/latest",
-        ) as response:
-            contents = await response.json()
-            latest_version = contents["tag_name"]
+        with Status("🔁 Checking for new version"):
+            async with aiohttp.ClientSession(
+                raise_for_status=True
+            ) as session, session.get(
+                "https://api.github.com/repos/gerlero/styro/releases/latest",
+            ) as response:
+                contents = await response.json()
+                latest_version = contents["tag_name"]
     except Exception:  # noqa: BLE001
         return False
 
@@ -119,24 +123,24 @@ class Styro(Package):
             )
             return
 
-        typer.echo("⏬ Downloading styro...")
-        try:
-            async with aiohttp.ClientSession(
-                raise_for_status=True
-            ) as session, session.get(
-                f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
-            ) as response:
-                contents = await response.read()
-        except Exception as e:
-            typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
-            raise typer.Exit(code=1) from e
-        typer.echo("⏳ Upgrading styro...")
-        try:
-            with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
-                tar.extract("styro", path=Path(sys.executable).parent)
-        except Exception as e:
-            typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
-            raise typer.Exit(code=1) from e
+        with Status("⏬ Downloading styro"):
+            try:
+                async with aiohttp.ClientSession(
+                    raise_for_status=True
+                ) as session, session.get(
+                    f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
+                ) as response:
+                    contents = await response.read()
+            except Exception as e:
+                typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
+                raise typer.Exit(code=1) from e
+        with Status("⏳ Upgrading styro"):
+            try:
+                with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
+                    tar.extract("styro", path=Path(sys.executable).parent)
+            except Exception as e:
+                typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
+                raise typer.Exit(code=1) from e
         typer.echo("✅ Package 'styro' upgraded successfully.")
 
     def dependencies(self) -> Set[Package]:

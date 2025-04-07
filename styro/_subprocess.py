@@ -5,28 +5,9 @@ import sys
 from collections import deque
 from io import StringIO
 from pathlib import Path
-from typing import Deque, Dict, List, Optional, TextIO, Tuple
+from typing import Deque, Dict, List, Optional
 
-_cmds: Dict[int, Tuple[str, Deque[str]]] = {}
-_displayed_lines = 0
-
-
-class _Stream:
-    def __init__(self, stream: TextIO) -> None:
-        self._stream = stream
-
-    def write(self, data: str) -> None:
-        _clear_status()
-        self._stream.write(data)
-        _display_status()
-
-    def flush(self) -> None:
-        self._stream.flush()
-
-
-_stdout = sys.stdout
-sys.stdout = _Stream(sys.stdout)
-sys.stderr = _Stream(sys.stderr)
+from ._status import Status
 
 
 def _cmd_join(cmd: List[str]) -> str:
@@ -35,45 +16,20 @@ def _cmd_join(cmd: List[str]) -> str:
     return shlex.join(cmd)
 
 
-def _clear_status() -> None:
-    global _displayed_lines  # noqa: PLW0603
-
-    if _displayed_lines:
-        _stdout.write(f"\033[{_displayed_lines}A\033[J")
-
-    _displayed_lines = 0
-
-
-def _display_status() -> None:
-    global _displayed_lines  # noqa: PLW0603
-
-    _clear_status()
-
-    for cmd, lines in _cmds.values():
-        _stdout.write(f"==> \033[1m{cmd}\033[0m\n")
-        _displayed_lines += 1
-
-        for line in lines:
-            _stdout.write(f"\033[90m{line[:64]}\033[0m\n")
-            _displayed_lines += 1
-
-
 async def run(
     cmd: List[str],
     *,
     cwd: Optional[Path] = None,
     env: Optional[Dict[str, str]] = None,
+    status: Optional[Status] = None,
 ) -> subprocess.CompletedProcess:
     proc = await asyncio.create_subprocess_exec(
         *cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
-    lines: Deque[str] = deque(maxlen=4)
-    _cmds[id(lines)] = (
-        f"({cwd.name}) {_cmd_join(cmd)}" if cwd else _cmd_join(cmd),
-        lines,
-    )
-    _display_status()
+    if status is not None:
+        cmdstr = f"==> \033[1m{_cmd_join(cmd)}\033[0m\n"
+        lines: Deque[str] = deque(maxlen=4)
 
     output = StringIO()
     error = StringIO()
@@ -85,8 +41,9 @@ async def run(
             if not line:
                 break
             output.write(line)
-            lines.append(line.strip())
-            _display_status()
+            if status is not None:
+                lines.append(f"\033[90m{line.strip()[:64]}\033[0m")
+                status(cmdstr + "\n".join(lines) + "\n")
 
     async def process_stderr() -> None:
         while True:
@@ -95,8 +52,9 @@ async def run(
             if not line:
                 break
             error.write(line)
-            lines.append(line.strip())
-            _display_status()
+            if status is not None:
+                lines.append(f"\033[90m{line.strip()[:64]}\033[0m")
+                status(cmdstr + "\n".join(lines) + "\n")
 
     await asyncio.gather(
         process_stdout(),
@@ -105,9 +63,6 @@ async def run(
 
     await proc.wait()
     assert proc.returncode is not None
-
-    del _cmds[id(lines)]
-    _display_status()
 
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(
