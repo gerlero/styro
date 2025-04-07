@@ -182,7 +182,7 @@ class Package:
     def _check_compatibility(self) -> None:
         assert self._metadata is not None
 
-        distro_compatibility = False
+        distro_compatible = False
         specs = self._metadata.get("version", [])
         for spec in specs:
             try:
@@ -218,18 +218,20 @@ class Package:
                 continue
 
             if (openfoam_version() < 1000) == (version < 1000):  # noqa: PLR2004
-                distro_compatibility = True
+                distro_compatible = True
                 if not compatible:
                     typer.echo(
                         f"🛑 Error: OpenFOAM version is {openfoam_version()}, but {self.name} requires {spec}.",
                         err=True,
                     )
+                    raise typer.Exit(code=1)
 
-        if not distro_compatibility:
+        if specs and not distro_compatible:
             typer.echo(
                 f"🛑 Error: {self.name} is not compatible with this OpenFOAM distribution (requires {', '.join(specs)}).",
                 err=True,
             )
+            raise typer.Exit(code=1)
 
     async def _fetch(self) -> bool:
         with lock() as installed:
