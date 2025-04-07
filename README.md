@@ -11,6 +11,9 @@
 [![Binaries](https://github.com/gerlero/styro/actions/workflows/binaries.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/binaries.yml)
 ![OpenFOAM](https://img.shields.io/badge/openfoam-.com%20|%20.org-informational)
 
+## ▶️ Demo
+
+![Demo](https://github.com/gerlero/styro/raw/main/demo.gif)
 
 ## ⏬ Installation
 
@@ -43,7 +46,7 @@ Choose any of the following methods:
 To actually install packages, **styro** needs OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)) and [Git](https://www.openfoam.com/download/git).
 
 
-## ✅ Available commands
+## 🧑‍💻 Available commands
 - ```styro install <packages>```: Install a package or packages (pass `--upgrade` to upgrade already installed packages)
 - ```styro uninstall <packages>```: Uninstall a package or packages
 - ```styro freeze```: List installed packages
