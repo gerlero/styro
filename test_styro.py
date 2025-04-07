@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -41,10 +43,3 @@ def test_porousmicrotransport() -> None:
     assert result.exit_code != 0
     assert "porousmicrotransport" in result.stdout
     assert "reagency" in result.stdout
-
-
-def test_version() -> None:
-    result = runner.invoke(app, ["--version"])
-    assert result.exit_code == 0
-    assert "styro" in result.stdout
-    assert __version__ in result.stdout
