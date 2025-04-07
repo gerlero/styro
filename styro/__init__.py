@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, Dict, List, Optional, Set, Union
 
 if sys.version_info >= (3, 9):
@@ -64,6 +65,8 @@ class Package:
 
     name: str
     _metadata: Optional[Dict[str, Any]]
+    _upgrade_available: bool = False
+    _origin: Optional[Union[str, Path]]
 
     @staticmethod
     def installed() -> List["Package"]:
@@ -119,7 +122,26 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
-    def __new__(cls, name: str) -> "Package":
+    def __new__(cls, package: str) -> "Package":
+        origin: Optional[Union[str, Path]] = None
+        if package.startswith(("http://", "https://")):
+            name = package.split("/")[-1].split(".")[0]
+            origin = package
+        elif package.startswith((".", "/", "~")):
+            origin = Path(package).absolute()
+            name = origin.name
+        else:
+            name = package
+            with lock as installed:
+                try:
+                    origin = installed["packages"][package]["origin"]
+                except KeyError:
+                    origin = None
+                else:
+                    assert isinstance(origin, str)
+                    if origin.startswith("file://"):
+                        origin = Path(origin[7:])
+
         name = name.lower().replace("_", "-")
 
         if name in cls._instances:
@@ -131,6 +153,7 @@ class Package:
         cls._instances[name] = instance
         instance.name = name
         instance._metadata = None
+        instance._origin = origin
         return instance
 
     def _build_steps(self) -> List[str]:
@@ -203,10 +226,42 @@ class Package:
             )
             raise typer.Exit(code=1)
 
-    async def _fetch(self) -> bool:
+    def _installed_sha(self) -> Optional[str]:
         with lock as installed:
-            with Status(f"🔍 Fetching {self.name}"):
-                if self._metadata is None:
+            try:
+                return installed["packages"][self.name]["sha"]
+            except KeyError:
+                return None
+
+    @lock
+    async def _fetch(self) -> None:
+        if self._metadata is None:
+            if isinstance(self._origin, Path):
+                try:
+                    self._metadata = json.loads(
+                        (self._origin / "metadata.json").read_text()
+                    )
+                except FileNotFoundError:
+                    self._metadata = {}
+                self._upgrade_available = True
+
+            elif isinstance(self._origin, str):
+                with Status(f"🔍 Fetching {self}"), TemporaryDirectory() as tmpdir:
+                    sha = await clone(
+                        Path(tmpdir) / self.name,
+                        self._origin,
+                    )
+                    try:
+                        self._metadata = json.loads(
+                            (Path(tmpdir) / self.name / "metadata.json").read_text()
+                        )
+                    except FileNotFoundError:
+                        self._metadata = {}
+                    self._upgrade_available = sha != self._installed_sha()
+
+            else:
+                assert self._origin is None
+                with Status(f"🔍 Fetching {self}"):
                     try:
                         async with aiohttp.ClientSession(
                             raise_for_status=True
@@ -223,18 +278,14 @@ class Package:
                         )
                         raise typer.Exit(code=1) from e
 
-                    self._check_compatibility()
-                    self._build_steps()
+                new_sha = await fetch(self._pkg_path, self._metadata["repo"])
+                if new_sha is not None:
+                    self._upgrade_available = new_sha != self._installed_sha()
+                else:
+                    self._upgrade_available = False
 
-                if self.is_installed():
-                    sha = await fetch(self._pkg_path, self._metadata["repo"])
-                    if (
-                        sha is not None
-                        and sha == installed["packages"][self.name]["sha"]
-                    ):
-                        return False
-
-            return True
+            self._check_compatibility()
+            self._build_steps()
 
     def dependencies(self) -> Set["Package"]:
         assert self._metadata is not None
@@ -263,15 +314,24 @@ class Package:
 
         _resolved.add(self)
 
-        if self.is_installed() and not upgrade and not _force_reinstall:
+        if (
+            self.is_installed()
+            and not upgrade
+            and not _force_reinstall
+            and not isinstance(self._origin, Path)
+        ):
             typer.echo(
                 f"✋ Package '{self.name}' is already installed.",
             )
             return set()
 
-        upgrade_available = await self._fetch()
+        await self._fetch()
 
-        if self.is_installed() and not (upgrade_available and upgrade):
+        if (
+            self.is_installed()
+            and not (self._upgrade_available and upgrade)
+            and not isinstance(self._origin, Path)
+        ):
             typer.echo(
                 f"✋ Package '{self.name}' is already up-to-date.",
             )
@@ -314,16 +374,38 @@ class Package:
                 await self.install_all({self}, upgrade=upgrade)
                 return
 
-            upgrade_available = await self._fetch()
+            await self._fetch()
             assert self._metadata is not None
 
-            if self.is_installed() and not _force_reinstall:
+            if isinstance(self._origin, Path):
+                if not self._origin.is_dir():
+                    typer.echo(
+                        f"🛑 Error: Package '{self.name}' source '{self._origin}' is not a directory.",
+                        err=True,
+                    )
+                    raise typer.Exit(code=1)
+                shutil.rmtree(
+                    self._pkg_path,
+                    ignore_errors=True,
+                )
+                shutil.copytree(
+                    self._origin,
+                    self._pkg_path,
+                )
+
+            if isinstance(self._origin, Path):
+                title = f"▶️ Copying {self.name}"
+            elif (
+                self.is_installed()
+                and not _force_reinstall
+                and not isinstance(self._origin, Path)
+            ):
                 if not upgrade:
                     typer.echo(
                         f"✋ Package '{self.name}' is already installed.",
                     )
                     return
-                if not upgrade_available:
+                if not self._upgrade_available:
                     typer.echo(
                         f"✋ Package '{self.name}' is already up to date.",
                     )
@@ -333,7 +415,23 @@ class Package:
                 title = f"⏬ Downloading {self.name}"
 
             with Status(title):
-                sha = await clone(self._pkg_path, self._metadata["repo"])
+                if isinstance(self._origin, Path):
+                    shutil.rmtree(
+                        self._pkg_path,
+                        ignore_errors=True,
+                    )
+                    shutil.copytree(
+                        self._origin,
+                        self._pkg_path,
+                    )
+                    sha = None
+                else:
+                    origin = (
+                        self._origin
+                        if isinstance(self._origin, str)
+                        else self._metadata["repo"]
+                    )
+                    sha = await clone(self._pkg_path, origin)
 
             if self.is_installed():
                 await self.uninstall(_force=True, _keep_pkg=True)
@@ -459,14 +557,21 @@ class Package:
                             new_libs = []
 
                         installed["packages"][self.name] = {
-                            "sha": sha,
                             "apps": [app.name for app in new_apps],
                             "libs": [lib.name for lib in new_libs],
                         }
+                        if sha is not None:
+                            installed["packages"][self.name]["sha"] = sha
                         if self.dependencies():
                             installed["packages"][self.name]["requires"] = [
                                 dep.name for dep in self.dependencies()
                             ]
+                        if isinstance(self._origin, Path):
+                            installed["packages"][self.name]["origin"] = (
+                                self._origin.as_uri()
+                            )
+                        elif isinstance(self._origin, str):
+                            installed["packages"][self.name]["origin"] = self._origin
 
                 typer.echo(f"✅ Package '{self.name}' installed successfully.")
 
@@ -527,4 +632,8 @@ class Package:
         return f"Package({self.name!r})"
 
     def __str__(self) -> str:
+        if isinstance(self._origin, Path):
+            return f"{self.name} @ {self._origin.as_uri()}"
+        if isinstance(self._origin, str):
+            return f"{self.name} @ {self._origin}"
         return self.name
