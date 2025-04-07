@@ -26,8 +26,7 @@ async def install(packages: List[str], *, upgrade: bool = False) -> None:
     if not upgrade or Package("styro") not in pkgs:
         await check_for_new_version(verbose=True)
 
-    with Package.lock(write=True):
-        await Package.install_all(pkgs, upgrade=upgrade)
+    await Package.install_all(pkgs, upgrade=upgrade)
 
 
 @app.command()
@@ -36,17 +35,15 @@ async def uninstall(packages: List[str]) -> None:
     """Uninstall OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
 
-    with Package.lock(write=True):
-        await Package.uninstall_all(pkgs)
+    await Package.uninstall_all(pkgs)
 
 
 @app.command()
 @async_to_sync
 async def freeze() -> None:
     """List installed OpenFOAM packages."""
-    with Package.lock():
-        for pkg in Package.installed():
-            typer.echo(pkg.name)
+    for pkg in Package.installed():
+        typer.echo(pkg.name)
 
 
 @async_to_sync

@@ -1,9 +1,10 @@
+import asyncio
 import io
 import platform
 import sys
 import tarfile
 from pathlib import Path
-from typing import Optional, Set
+from typing import Dict, Optional, Set, Union
 
 import aiohttp
 import typer
@@ -30,9 +31,7 @@ def print_upgrade_instruction() -> None:
 
 async def check_for_new_version(*, verbose: bool = True) -> bool:
     try:
-        async with aiohttp.ClientSession(
-            raise_for_status=True, timeout=2
-        ) as session, session.get(
+        async with aiohttp.ClientSession(raise_for_status=True) as session, session.get(
             "https://api.github.com/repos/gerlero/styro/releases/latest",
         ) as response:
             contents = await response.json()
@@ -66,9 +65,7 @@ class Styro(Package):
         _force_reinstall: bool = False,
         _resolved: Optional[Set["Package"]] = None,
     ) -> Set["Package"]:
-        assert _force_reinstall is False
-
-        if not upgrade:
+        if not upgrade and not _force_reinstall:
             typer.echo(
                 "✋ Package 'styro' is already installed.",
             )
@@ -79,7 +76,7 @@ class Styro(Package):
         if self._metadata is not None:
             self._metadata = {}
 
-        if not await check_for_new_version(verbose=False):
+        if not _force_reinstall and not await check_for_new_version(verbose=False):
             typer.echo(
                 "✋ Package 'styro' is already up-to-date.",
             )
@@ -95,14 +92,32 @@ class Styro(Package):
 
         return {self}
 
-    async def install(self, *, upgrade: bool = False, _deps: bool = True) -> None:
-        if not upgrade:
+    async def install(
+        self,
+        *,
+        upgrade: bool = False,
+        _force_reinstall: bool = False,
+        _deps: Union[bool, Dict[Package, asyncio.Event]] = True,
+    ) -> None:
+        if not upgrade and not _force_reinstall:
             typer.echo(
                 "✋ Package 'styro' is already installed.",
             )
             return
 
-        assert not is_managed_installation()
+        if is_managed_installation():
+            typer.echo(
+                "🛑 Error: This is a managed installation of styro.",
+                err=True,
+            )
+            print_upgrade_instruction()
+            raise typer.Exit(code=1)
+
+        if not _force_reinstall and not await check_for_new_version(verbose=False):
+            typer.echo(
+                "✋ Package 'styro' is already up-to-date.",
+            )
+            return
 
         typer.echo("⏬ Downloading styro...")
         try:
