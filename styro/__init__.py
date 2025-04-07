@@ -87,21 +87,6 @@ class Package:
 
     @staticmethod
     @lock
-    def _sort_for_install(pkgs: Set["Package"]) -> List["Package"]:
-        unsorted = set(pkgs)
-        sorted_: List[Package] = []
-
-        while unsorted:
-            for pkg in list(unsorted):
-                if all(dep not in pkgs or dep in sorted_ for dep in pkg.dependencies()):
-                    sorted_.append(pkg)
-                    unsorted.remove(pkg)
-
-        assert len(sorted_) == len(pkgs)
-        return sorted_
-
-    @staticmethod
-    @lock
     async def install_all(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
