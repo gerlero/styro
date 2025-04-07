@@ -3,7 +3,6 @@ __version__ = "0.1.17"
 import asyncio
 import contextlib
 import fcntl
-import io
 import json
 import os
 import shutil
@@ -23,57 +22,39 @@ import typer
 from ._git import clone, fetch
 from ._openfoam import openfoam_version, platform_path
 from ._subprocess import run
-
-_lock_depth = 0
-_installed: Optional[Dict[str, Any]] = None
-_file: Optional[io.TextIOWrapper] = None
+from ._util import reentrantcontextmanager
 
 
-@contextlib.contextmanager
-def lock() -> Generator[Dict[str, Any], None, None]:
-    global _lock_depth  # noqa: PLW0603
-    global _installed  # noqa: PLW0603
-    global _file  # noqa: PLW0603
+@reentrantcontextmanager
+def _lock() -> Generator[Dict[str, Any], None, None]:
+    installed_path = platform_path() / "styro" / "installed.json"
 
-    if _lock_depth == 0:
-        installed_path = platform_path() / "styro" / "installed.json"
+    installed_path.parent.mkdir(parents=True, exist_ok=True)
+    installed_path.touch(exist_ok=True)
+    with installed_path.open("r+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
 
-        installed_path.parent.mkdir(parents=True, exist_ok=True)
-        installed_path.touch(exist_ok=True)
-        _file = installed_path.open("r+")
-        fcntl.flock(_file, fcntl.LOCK_EX)
-
-        if _file.seek(0, os.SEEK_END) == 0:
-            _installed = {"version": 1, "packages": {}}
+        if f.seek(0, os.SEEK_END) == 0:
+            installed = {"version": 1, "packages": {}}
         else:
-            _file.seek(0)
-            _installed = json.load(_file)
-            assert isinstance(_installed, dict)
-            if _installed.get("version") != 1:
+            f.seek(0)
+            installed = json.load(f)
+            assert isinstance(installed, dict)
+            if installed.get("version") != 1:
                 typer.echo(
                     "Error: installed.json file is of a newer version. Please upgrade styro.",
                     err=True,
                 )
-                _file.close()
-                _file = None
-                _installed = None
                 raise typer.Exit(code=1)
+        try:
+            yield installed
+        finally:
+            f.seek(0)
+            f.write(json.dumps(installed, indent=2))
+            f.truncate()
 
-    assert isinstance(_installed, dict)
-    assert _file is not None
-    _lock_depth += 1
-    try:
-        yield _installed
-    finally:
-        _lock_depth -= 1
-        if _lock_depth == 0:
-            _file.seek(0)
-            _file.write(json.dumps(_installed, indent=2))
-            _file.truncate()
-            _file.close()
-            _file = None
-            _installed = None
-        assert _lock_depth >= 0
+
+lock = _lock()
 
 
 class Package:
@@ -85,11 +66,11 @@ class Package:
 
     @staticmethod
     def installed() -> List["Package"]:
-        with lock() as installed:
+        with lock as installed:
             return [Package(name) for name in installed["packages"]]
 
     @staticmethod
-    @lock()
+    @lock
     async def _resolve_all(
         pkgs: Set["Package"],
         *,
@@ -105,7 +86,7 @@ class Package:
         }
 
     @staticmethod
-    @lock()
+    @lock
     def _sort_for_install(pkgs: Set["Package"]) -> List["Package"]:
         unsorted = set(pkgs)
         sorted_: List[Package] = []
@@ -120,7 +101,7 @@ class Package:
         return sorted_
 
     @staticmethod
-    @lock()
+    @lock
     async def install_all(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
@@ -135,7 +116,7 @@ class Package:
         )
 
     @staticmethod
-    @lock()
+    @lock
     async def uninstall_all(pkgs: Set["Package"]) -> None:
         dependents = set()
         for pkg in pkgs:
@@ -237,7 +218,7 @@ class Package:
             raise typer.Exit(code=1)
 
     async def _fetch(self) -> bool:
-        with lock() as installed:
+        with lock as installed:
             if self._metadata is None:
                 try:
                     async with aiohttp.ClientSession(
@@ -268,14 +249,14 @@ class Package:
         return {Package(name) for name in self._metadata.get("requires", [])}
 
     def installed_dependents(self) -> Set["Package"]:
-        with lock() as installed:
+        with lock as installed:
             return {
                 Package(name)
                 for name, data in installed["packages"].items()
                 if self.name in data.get("requires", [])
             }
 
-    @lock()
+    @lock
     async def resolve(
         self,
         *,
@@ -324,7 +305,7 @@ class Package:
         return ret
 
     def is_installed(self) -> bool:
-        with lock() as installed:
+        with lock as installed:
             return self.name in installed["packages"]
 
     @property
@@ -338,7 +319,7 @@ class Package:
         _force_reinstall: bool = False,
         _deps: Union[bool, Dict["Package", asyncio.Event]] = True,
     ) -> None:
-        with lock() as installed:
+        with lock as installed:
             if _deps is True:
                 await self.install_all({self}, upgrade=upgrade)
                 return
@@ -516,7 +497,7 @@ class Package:
             assert not _keep_pkg
             await self.uninstall_all({self})
 
-        with lock() as installed:
+        with lock as installed:
             if not self.is_installed():
                 typer.echo(
                     f"⚠️ Warning: skipping package '{self.name}' as it is not installed.",
