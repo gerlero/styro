@@ -81,7 +81,8 @@ class Status:
         traceback: Optional[TracebackType],
     ) -> None:
         Status._statuses.remove(self)
-        if not Status._statuses and Status._animation_task is not None:
+        if not Status._statuses:
+            assert Status._animation_task is not None
             Status._animation_task.cancel()
             Status._animation_task = None
         Status.display()

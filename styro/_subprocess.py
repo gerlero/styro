@@ -53,7 +53,7 @@ async def run(
                 break
             error.write(line)
             if status is not None:
-                lines.append(f"\033[90m{line.strip()[:64]}\033[0m")
+                lines.append(f"\033[33m{line.strip()[:64]}\033[0m")
                 status(cmdstr + "\n".join(lines) + "\n")
 
     await asyncio.gather(
