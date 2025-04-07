@@ -23,7 +23,25 @@ def test_styro() -> None:
     int(os.environ.get("FOAM_API", "0")) < 2112,  # noqa: PLR2004
     reason="requires OpenFOAM v2112 or later",
 )
-def test_porousmicrotransport() -> None:
+def test_basic_install() -> None:
+    result = runner.invoke(app, ["uninstall", "reagency"])
+    assert result.exit_code == 0
+    assert "reagency" in result.stdout
+
+    result = runner.invoke(app, ["install", "reagency"])
+    assert result.exit_code == 0
+    assert "reagency" in result.stdout
+
+    result = runner.invoke(app, ["freeze"])
+    assert result.exit_code == 0
+    assert "reagency" in result.stdout
+
+
+@pytest.mark.skipif(
+    int(os.environ.get("FOAM_API", "0")) < 2112,  # noqa: PLR2004
+    reason="requires OpenFOAM v2112 or later",
+)
+def test_package_with_dependencies() -> None:
     result = runner.invoke(app, ["uninstall", "porousmicrotransport", "reagency"])
     assert result.exit_code == 0
     assert "porousmicrotransport" in result.stdout
@@ -40,6 +58,20 @@ def test_porousmicrotransport() -> None:
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code != 0
     assert "porousmicrotransport" in result.stdout
+    assert "reagency" in result.stdout
+
+
+@pytest.mark.skipif(
+    int(os.environ.get("FOAM_API", "0")) < 2112,  # noqa: PLR2004
+    reason="requires OpenFOAM v2112 or later",
+)
+def test_install_from_git_repository() -> None:
+    result = runner.invoke(app, ["install", "https://github.com/gerlero/reagency.git"])
+    assert result.exit_code == 0
+    assert "reagency" in result.stdout
+
+    result = runner.invoke(app, ["freeze"])
+    assert result.exit_code == 0
     assert "reagency" in result.stdout
 
 

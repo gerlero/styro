@@ -54,4 +54,28 @@ To actually install packages, **styro** needs OpenFOAM (from either [openfoam.co
 
 ## 📦 Available packages
 
-**styro** is able to install community packages listed in the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi).
+### ✨ Indexed packages (OPI)
+
+**styro** is able to install community packages listed in the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi). 
+
+See [here](https://github.com/exasim-project/opi/tree/main/pkg) for the complete list of available packages.
+
+### 🖥️ Local packages
+
+You can also install local packages by passing the path to the package directory:
+
+```bash
+styro install /path/to/package
+```
+
+For customization, you can add a [`metadata.json`](https://github.com/exasim-project/opi/blob/main/metadata.json) file directly into the package directory.
+
+### 🌎 Git repositories
+
+Installing directly from a Git repository is also supported. E.g.:
+
+```bash
+styro install https://github.com/gerlero/reagency.git
+```
+
+Same as with local packages, you can add a [`metadata.json`](https://github.com/exasim-project/opi/blob/main/metadata.json) file to the root of the repository to customize the installation.
