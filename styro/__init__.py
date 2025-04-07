@@ -128,7 +128,10 @@ class Package:
         }
 
         await asyncio.gather(
-            *(pkg.install(_deps=to_install) for pkg in to_install),
+            *(
+                pkg.install(_force_reinstall=True, _deps=to_install)
+                for pkg in to_install
+            ),
         )
 
     @staticmethod
