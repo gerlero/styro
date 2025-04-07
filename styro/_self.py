@@ -1,9 +1,14 @@
+import io
+import platform
 import sys
+import tarfile
+from pathlib import Path
+from typing import Optional, Set
 
 import aiohttp
 import typer
 
-from . import __version__
+from . import Package, __version__
 
 
 def is_managed_installation() -> bool:
@@ -13,12 +18,12 @@ def is_managed_installation() -> bool:
 def print_upgrade_instruction() -> None:
     if is_managed_installation():
         typer.echo(
-            "Use your package manager (e.g. pip) to upgrade styro.",
+            "💡 Use your package manager (e.g. pip) to upgrade styro.",
             err=True,
         )
     else:
         typer.echo(
-            "Run 'styro install --upgrade styro' to upgrade styro.",
+            "💡 Run 'styro install --upgrade styro' to upgrade styro.",
             err=True,
         )
 
@@ -48,3 +53,96 @@ async def check_for_new_version(*, verbose: bool = True) -> bool:
         return True
 
     return False
+
+
+class Styro(Package):
+    def is_installed(self) -> bool:
+        return True
+
+    async def resolve(
+        self,
+        *,
+        upgrade: bool = False,
+        _force_reinstall: bool = False,
+        _resolved: Optional[Set["Package"]] = None,
+    ) -> Set["Package"]:
+        assert _force_reinstall is False
+
+        if not upgrade:
+            typer.echo(
+                "✋ Package 'styro' is already installed.",
+            )
+            return set()
+
+        typer.echo("🔍 Resolving styro..")
+
+        if self._metadata is not None:
+            self._metadata = {}
+
+        if not await check_for_new_version(verbose=False):
+            typer.echo(
+                "✋ Package 'styro' is already up-to-date.",
+            )
+            return set()
+
+        if is_managed_installation():
+            typer.echo(
+                "🛑 Error: This is a managed installation of styro.",
+                err=True,
+            )
+            print_upgrade_instruction()
+            raise typer.Exit(code=1)
+
+        return {self}
+
+    async def install(self, *, upgrade: bool = False, _deps: bool = True) -> None:
+        if not upgrade:
+            typer.echo(
+                "✋ Package 'styro' is already installed.",
+            )
+            return
+
+        assert not is_managed_installation()
+
+        typer.echo("⏬ Downloading styro...")
+        try:
+            async with aiohttp.ClientSession(
+                raise_for_status=True
+            ) as session, session.get(
+                f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
+            ) as response:
+                contents = await response.read()
+        except Exception as e:
+            typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
+            raise typer.Exit(code=1) from e
+        typer.echo("⏳ Upgrading styro...")
+        try:
+            with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
+                tar.extract("styro", path=Path(sys.executable).parent)
+        except Exception as e:
+            typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
+            raise typer.Exit(code=1) from e
+        typer.echo("✅ Package 'styro' upgraded successfully.")
+
+    def dependencies(self) -> Set[Package]:
+        return set()
+
+    def installed_dependents(self) -> Set[Package]:
+        return {self}
+
+    async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
+        typer.echo(
+            "🛑 Error: styro cannot be uninstalled this way.",
+            err=True,
+        )
+        if is_managed_installation():
+            typer.echo(
+                "💡 Use your package manager (e.g. pip) to uninstall styro.",
+                err=True,
+            )
+        else:
+            typer.echo(
+                "💡 Delete the 'styro' binary in $FOAM_USER_APPBIN to uninstall.",
+                err=True,
+            )
+        raise typer.Exit(code=1)

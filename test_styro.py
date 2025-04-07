@@ -37,6 +37,11 @@ def test_porousmicrotransport() -> None:
     assert "porousmicrotransport" in result.stdout
     assert "reagency" in result.stdout
 
+    result = runner.invoke(app, ["uninstall", "reagency"])
+    assert result.exit_code != 0
+    assert "porousmicrotransport" in result.stdout
+    assert "reagency" in result.stdout
+
 
 def test_version() -> None:
     result = runner.invoke(app, ["--version"])
