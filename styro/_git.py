@@ -26,7 +26,7 @@ async def _set_remote_url(repo: Path, url: str) -> None:
     )
 
 
-async def fetch(repo: Path, url: str) -> Optional[str]:
+async def fetch(repo: Path, url: str, *, missing_ok: bool = True) -> Optional[str]:
     try:
         await _set_remote_url(repo, url)
         branch = await _get_default_branch(repo)
@@ -42,7 +42,9 @@ async def fetch(repo: Path, url: str) -> Optional[str]:
         ).stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
         shutil.rmtree(repo, ignore_errors=True)
-        return None
+        if missing_ok:
+            return None
+        return await clone(repo, url)
 
 
 async def clone(repo: Path, url: str) -> str:

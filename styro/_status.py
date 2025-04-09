@@ -31,6 +31,7 @@ class Status:
 
     @staticmethod
     def clear() -> None:
+        sys.stdout.flush()
         if Status._printed_lines > 0:
             _stdout.write(f"\033[{Status._printed_lines}A\033[J")
         Status._printed_lines = 0

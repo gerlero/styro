@@ -1,8 +1,10 @@
 import asyncio
 import sys
 from functools import wraps
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Generic, Optional, Type, TypeVar, cast
+from urllib.parse import unquote, urlparse
 
 if sys.version_info >= (3, 9):
     from collections.abc import Callable, Coroutine, Generator
@@ -75,3 +77,10 @@ def reentrantcontextmanager(
         return _ReentrantContextManager(lambda: func(*args, **kwargs))
 
     return wrapper
+
+
+def path_from_uri(uri: str) -> Path:
+    assert uri.startswith("file://")
+    if sys.version_info >= (3, 13):
+        return Path.from_uri(uri)
+    return Path(unquote(urlparse(uri).path))

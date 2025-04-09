@@ -10,7 +10,8 @@ else:
 
 import typer
 
-from . import Package, __version__
+from . import __version__
+from ._packages import Package
 from ._self import check_for_new_version
 from ._util import async_to_sync
 
