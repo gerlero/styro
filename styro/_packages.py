@@ -11,7 +11,7 @@ import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
 
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
@@ -82,13 +82,32 @@ class Package:
 
     @staticmethod
     def _check_for_duplicate_names(pkgs: Set["Package"]) -> None:
-        names = {pkg.name for pkg in pkgs}
-        if len(names) != len(pkgs):
+        duplicate_names = {
+            pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
+        }
+        if duplicate_names:
             typer.echo(
-                "🛑 Error: Duplicate package names found.",
+                f"🛑 Error: duplicate/conflicting package names: {', '.join(duplicate_names)}",
                 err=True,
             )
             raise typer.Exit(code=1)
+
+    @staticmethod
+    def parse_package(
+        package: str,
+    ) -> Union[Tuple[str, None], Tuple[None, str], Tuple[str, str]]:
+        name = package.strip().lower().replace("_", "-")
+        if Package.__name_regex.match(name):
+            return name, None
+        if "@" in package:
+            name, origin = package.split("@", 1)
+            name = name.strip().lower().replace("_", "-")
+            origin = origin.strip()
+            if Package.__name_regex.match(name):
+                return name, origin
+            msg = f"Invalid package name: {name}"
+            raise ValueError(msg)
+        return None, package.strip()
 
     @staticmethod
     def installed() -> Set["Package"]:
@@ -123,6 +142,8 @@ class Package:
 
         not_to_install = pkgs.difference(to_install)
 
+        Package._check_for_duplicate_names(set(to_install).union(not_to_install))
+
         await asyncio.gather(
             *(pkg.install(upgrade=upgrade, _deps=False) for pkg in not_to_install),
             *(
@@ -153,32 +174,34 @@ class Package:
         if cls is not Package:
             return super().__new__(cls)
 
+        name, origin = Package.parse_package(package)
+
         with lock as installed:
-            name = package.lower().replace("_", "-")
-            if Package.__name_regex.match(name):
-                package = name
+            if name is not None and origin is None:
                 with contextlib.suppress(KeyError):
-                    package = installed["packages"][name]["origin"]
+                    origin = installed["packages"][name]["origin"]
+
+            key = origin if origin is not None else name
+            assert key is not None
 
             try:
-                return Package.__instances[package]
+                return Package.__instances[key]
             except KeyError:
-                if package.startswith((".", "/", "~", "file://")):
-                    instance: Package = super().__new__(_LocalPackage)
-                elif package.startswith(("http://", "https://")):
-                    instance = super().__new__(_GitPackage)
-                elif package == "styro":
+                if origin is not None and origin.startswith(("http://", "https://")):
+                    instance: Package = super().__new__(_GitPackage)
+                elif origin is not None:
+                    instance = super().__new__(_LocalPackage)
+                elif name == "styro":
                     instance = super().__new__(_Styro)
                 else:
                     instance = super().__new__(_IndexedPackage)
 
-                Package.__instances[package] = instance
+                Package.__instances[key] = instance
 
                 return instance
 
     def __init__(self, name: str) -> None:
         if not hasattr(self, "name"):
-            name = name.lower().replace("_", "-")
             if not Package.__name_regex.match(name):
                 msg = f"Invalid package name: {name}"
                 raise ValueError(msg)
@@ -186,7 +209,7 @@ class Package:
                 msg = "'styro' not allowed as a package name."
                 raise ValueError(msg)
             self.name = name
-            self._origin: Optional[Union[str, Path]] = None
+            self.origin: Optional[Union[str, Path]] = None
             self._metadata: Optional[Dict[str, Any]] = None
             self._upgrade_available = False
 
@@ -298,7 +321,7 @@ class Package:
         dependencies = await asyncio.gather(
             *(
                 dep.resolve(upgrade=True, _resolved=_resolved)
-                for dep in self.dependencies()
+                for dep in self.requested_dependencies()
             ),
             *(
                 dep.resolve(_force_reinstall=True, _resolved=_resolved)
@@ -315,6 +338,8 @@ class Package:
 
     def installed_apps(self) -> Set[Path]:
         with lock as installed:
+            if not self.is_installed():
+                return set()
             try:
                 return {
                     Path(platform_path() / "bin" / app)
@@ -325,6 +350,8 @@ class Package:
 
     def installed_libs(self) -> Set[Path]:
         with lock as installed:
+            if not self.is_installed():
+                return set()
             try:
                 return {
                     Path(platform_path() / "lib" / lib)
@@ -335,12 +362,14 @@ class Package:
 
     def installed_sha(self) -> Optional[str]:
         with lock as installed:
+            if not self.is_installed():
+                return None
             try:
                 return installed["packages"][self.name]["sha"]
             except KeyError:
                 return None
 
-    def dependencies(self) -> Set["Package"]:
+    def requested_dependencies(self) -> Set["Package"]:
         assert self._metadata is not None
         return {Package(name) for name in self._metadata.get("requires", [])}
 
@@ -400,13 +429,13 @@ class Package:
 
             sha = await self.download()
 
-            if self.name in installed.get("packages", {}):
-                await self.uninstall(_force=True, _keep_pkg=True)
-                assert self.name not in installed.get("packages", {})
+            if Package(self.name).is_installed():
+                await Package(self.name).uninstall(_force=True, _keep_pkg=True)
+
             assert not self.is_installed()
 
             if isinstance(_deps, dict):
-                dependencies = self.dependencies()
+                dependencies = self.requested_dependencies()
                 await asyncio.gather(
                     *(
                         event.wait()
@@ -445,7 +474,7 @@ class Package:
                     except FileNotFoundError:
                         current_libs = {}
 
-                    if self.dependencies():
+                    if self.requested_dependencies():
                         env = os.environ.copy()
                         env["OPI_DEPENDENCIES"] = str(self._pkg_path.parent)
                     else:
@@ -533,16 +562,16 @@ class Package:
                         }
                         if sha is not None:
                             installed["packages"][self.name]["sha"] = sha
-                        if self.dependencies():
+                        if self.requested_dependencies():
                             installed["packages"][self.name]["requires"] = [
-                                dep.name for dep in self.dependencies()
+                                dep.name for dep in self.requested_dependencies()
                             ]
-                        if isinstance(self._origin, Path):
+                        if isinstance(self.origin, Path):
                             installed["packages"][self.name]["origin"] = (
-                                self._origin.as_uri()
+                                self.origin.as_uri()
                             )
-                        elif isinstance(self._origin, str):
-                            installed["packages"][self.name]["origin"] = self._origin
+                        elif isinstance(self.origin, str):
+                            installed["packages"][self.name]["origin"] = self.origin
 
                 self._upgrade_available = False
 
@@ -572,7 +601,7 @@ class Package:
             await self.uninstall_all({self})
 
         with lock as installed:
-            if self.name not in installed.get("packages", {}):
+            if not self.is_installed():
                 typer.echo(
                     f"⚠️ Warning: skipping package '{self.name}' as it is not installed.",
                     err=True,
@@ -607,10 +636,10 @@ class Package:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Package):
             return NotImplemented
-        return self.name == other.name and self._origin == other._origin
+        return self.name == other.name and self.origin == other.origin
 
     def __hash__(self) -> int:
-        return hash((self.name, self._origin))
+        return hash((self.name, self.origin))
 
 
 class _IndexedPackage(Package):
@@ -650,18 +679,25 @@ class _IndexedPackage(Package):
 
 class _GitPackage(Package):
     def __init__(self, package: str) -> None:
-        if not package.startswith(("http://", "https://")):
-            package = package.lower().replace("_", "-")
-            with lock as installed:
-                package = installed["packages"][package]["origin"]
+        name, origin = Package.parse_package(package)
 
-        super().__init__(package.rsplit("/", 1)[-1].split(".", 1)[0])
-        self._origin = package
+        if origin is None:
+            assert name is not None
+            with lock as installed:
+                origin = installed["packages"][name]["origin"]
+
+        assert origin.startswith(("http://", "https://"))
+
+        if name is None:
+            name = origin.rsplit("/", 1)[-1].split(".", 1)[0]
+
+        super().__init__(name)
+        self.origin = origin
 
     async def fetch(self) -> None:
         with Status(f"⏬ Downloading {self}"):
-            assert isinstance(self._origin, str)
-            new_sha = await fetch(self._pkg_path, self._origin, missing_ok=False)
+            assert isinstance(self.origin, str)
+            new_sha = await fetch(self._pkg_path, self.origin, missing_ok=False)
         assert new_sha is not None
         branch = (
             await run(
@@ -679,48 +715,54 @@ class _GitPackage(Package):
         self._upgrade_available = new_sha != self.installed_sha()
 
     async def download(self) -> str:
-        assert isinstance(self._origin, str)
-        return await clone(self._pkg_path, self._origin)
+        assert isinstance(self.origin, str)
+        return await clone(self._pkg_path, self.origin)
 
     def __str__(self) -> str:
-        return f"{self.name} @ {self._origin}"
+        return f"{self.name} @ {self.origin}"
 
 
 class _LocalPackage(Package):
     def __init__(self, package: str) -> None:
-        if not package.startswith((".", "/", "~", "file://")):
-            package = package.lower().replace("_", "-")
-            with lock as installed:
-                package = installed["packages"][package]["origin"]
+        name, origin = Package.parse_package(package)
 
-        if package.startswith("file://"):
-            path = path_from_uri(package)
+        if origin is None:
+            assert name is not None
+            with lock as installed:
+                origin = installed["packages"][name]["origin"]
+
+        if origin.startswith("file://"):
+            path = path_from_uri(origin)
         else:
-            path = Path(package).absolute()
-        super().__init__(path.name)
-        self._origin = path
+            path = Path(origin).absolute()
+
+        if name is None:
+            name = path.name
+
+        super().__init__(name)
+        self.origin = path
 
     async def fetch(self) -> None:
         try:
-            assert isinstance(self._origin, Path)
-            self._metadata = json.loads((self._origin / "metadata.json").read_text())
+            assert isinstance(self.origin, Path)
+            self._metadata = json.loads((self.origin / "metadata.json").read_text())
         except FileNotFoundError:
             self._metadata = {}
         self._upgrade_available = True
 
     async def download(self) -> None:
         assert self._metadata is not None
-        assert isinstance(self._origin, Path)
+        assert isinstance(self.origin, Path)
         shutil.rmtree(self._pkg_path, ignore_errors=True)
         self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(
-            self._origin,
+            self.origin,
             self._pkg_path,
         )
 
     def __str__(self) -> str:
-        assert isinstance(self._origin, Path)
-        return f"{self.name} @ {self._origin.as_uri()}"
+        assert isinstance(self.origin, Path)
+        return f"{self.name} @ {self.origin.as_uri()}"
 
 
 class _Styro(Package):
