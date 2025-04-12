@@ -1,9 +1,10 @@
 import asyncio
 import sys
+from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Generic, Optional, Type, TypeVar, cast
+from typing import Any, Generic, Optional, Set, Type, TypeVar, cast
 from urllib.parse import unquote, urlparse
 
 if sys.version_info >= (3, 9):
@@ -84,3 +85,15 @@ def path_from_uri(uri: str) -> Path:
     if sys.version_info >= (3, 13):
         return Path.from_uri(uri)
     return Path(unquote(urlparse(uri).path))
+
+
+@contextmanager
+def get_changed_files(path: Path) -> Generator[Set[Path], None, None]:
+    before = {file: file.stat().st_mtime for file in path.rglob("*") if file.is_file()}
+    ret: Set[Path] = set()
+    try:
+        yield ret
+    finally:
+        for file in path.rglob("*"):
+            if file.is_file() and file.stat().st_mtime != before.get(file):
+                ret.add(file)

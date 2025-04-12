@@ -43,7 +43,7 @@ async def uninstall(packages: List[str]) -> None:
 @async_to_sync
 async def freeze() -> None:
     """List installed OpenFOAM packages."""
-    for pkg in Package.installed():
+    for pkg in Package.all_installed():
         typer.echo(pkg)
 
 
