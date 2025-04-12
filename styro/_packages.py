@@ -22,7 +22,7 @@ import aiohttp
 import typer
 
 from ._git import clone, fetch
-from ._openfoam import openfoam_version, platform_path
+from ._openfoam import get_changed_binaries, openfoam_version, platform_path
 from ._self import (
     check_for_new_version,
     is_managed_installation,
@@ -92,6 +92,21 @@ class Package:
             raise typer.Exit(code=1)
 
     @staticmethod
+    def all_installed_binaries() -> Set[Path]:
+        with lock as installed:
+            return {
+                Path(platform_path() / "bin" / app)
+                for pkg in installed.get("packages", {}).values()
+                for app in pkg.get("apps", [])
+            }.union(
+                {
+                    Path(platform_path() / "lib" / lib)
+                    for pkg in installed.get("packages", {}).values()
+                    for lib in pkg.get("libs", [])
+                }
+            )
+
+    @staticmethod
     def parse_package(
         package: str,
     ) -> Union[Tuple[str, None], Tuple[None, str], Tuple[str, str]]:
@@ -112,7 +127,7 @@ class Package:
         return None, package
 
     @staticmethod
-    def installed() -> Set["Package"]:
+    def all_installed() -> Set["Package"]:
         with lock as installed:
             return {Package(name) for name in installed.get("packages", {})}
 
@@ -330,29 +345,22 @@ class Package:
         return ret
 
     def is_installed(self) -> bool:
-        return self in self.installed()
+        return self in self.all_installed()
 
-    def installed_apps(self) -> Set[Path]:
+    def installed_binaries(self) -> Set[Path]:
         with lock as installed:
             if not self.is_installed():
                 return set()
             try:
                 return {
                     Path(platform_path() / "bin" / app)
-                    for app in installed["packages"][self.name]["apps"]
-                }
-            except KeyError:
-                return set()
-
-    def installed_libs(self) -> Set[Path]:
-        with lock as installed:
-            if not self.is_installed():
-                return set()
-            try:
-                return {
-                    Path(platform_path() / "lib" / lib)
-                    for lib in installed["packages"][self.name]["libs"]
-                }
+                    for app in installed["packages"][self.name].get("apps", [])
+                }.union(
+                    {
+                        Path(platform_path() / "lib" / app)
+                        for app in installed["packages"][self.name].get("libs", [])
+                    }
+                )
             except KeyError:
                 return set()
 
@@ -442,146 +450,92 @@ class Package:
 
             async with self.__install_lock:
                 with Status(f"⏳ Installing {self.name}") as status:
-                    installed_apps = {
-                        app
-                        for p in installed.get("packages", {})
-                        for app in installed.get("packages", {})[p].get("apps", [])
-                    }
-                    installed_libs = {
-                        lib
-                        for p in installed.get("packages", {})
-                        for lib in installed.get("packages", {})[p].get("libs", [])
-                    }
-
-                    try:
-                        current_apps = {
-                            f: f.stat().st_mtime
-                            for f in (platform_path() / "bin").iterdir()
-                            if f.is_file()
-                        }
-                    except FileNotFoundError:
-                        current_apps = {}
-                    try:
-                        current_libs = {
-                            f: f.stat().st_mtime
-                            for f in (platform_path() / "lib").iterdir()
-                            if f.is_file()
-                        }
-                    except FileNotFoundError:
-                        current_libs = {}
-
                     if self.requested_dependencies():
                         env = os.environ.copy()
                         env["OPI_DEPENDENCIES"] = str(self._pkg_path.parent)
                     else:
                         env = None
 
-                    for cmd in self._build_steps():
-                        try:
-                            await run(
-                                ["/bin/bash", "-c", cmd],
-                                cwd=self._pkg_path,
-                                env=env,
-                                status=status,
-                            )
-                        except subprocess.CalledProcessError as e:
-                            typer.echo(
-                                f"🛑 Error: failed to build package '{self.name}'\n{e.stderr}",
-                                err=True,
-                            )
-
-                            try:
-                                new_apps = sorted(
-                                    f
-                                    for f in (platform_path() / "bin").iterdir()
-                                    if f.is_file()
-                                    and f not in installed_apps
-                                    and (
-                                        f not in current_apps
-                                        or f.stat().st_mtime > current_apps[f]
-                                    )
+                    try:
+                        with get_changed_binaries() as installed_binaries:
+                            for cmd in self._build_steps():
+                                await run(
+                                    ["/bin/bash", "-c", cmd],
+                                    cwd=self._pkg_path,
+                                    env=env,
+                                    status=status,
                                 )
-                            except FileNotFoundError:
-                                new_apps = []
-
-                            try:
-                                new_libs = sorted(
-                                    f
-                                    for f in (platform_path() / "lib").iterdir()
-                                    if f.is_file()
-                                    and f not in installed_libs
-                                    and (
-                                        f not in current_libs
-                                        or f.stat().st_mtime > current_libs[f]
-                                    )
+                    except subprocess.CalledProcessError as e:
+                        typer.echo(
+                            f"🛑 Error: failed to build package '{self.name}'\n{e.stderr}",
+                            err=True,
+                        )
+                        raise typer.Exit(code=1) from e
+                    finally:
+                        all_installed_binaries = self.all_installed_binaries()
+                        for path in list(installed_binaries):
+                            if path in all_installed_binaries:
+                                typer.echo(
+                                    f"⚠️ Warning: {self.name} modified {path}, which was installed by another package!",
+                                    err=True,
                                 )
-                            except FileNotFoundError:
-                                new_libs = []
+                                installed_binaries.remove(path)
 
-                            for app in new_apps:
-                                with contextlib.suppress(FileNotFoundError):
-                                    app.unlink()
+                    if not installed:
+                        installed["version"] = 1
+                        installed["packages"] = {}
 
-                            for lib in new_libs:
-                                with contextlib.suppress(FileNotFoundError):
-                                    lib.unlink()
+                    installed["packages"][self.name] = {}
 
-                            shutil.rmtree(self._pkg_path, ignore_errors=True)
+                    if sha is not None:
+                        installed["packages"][self.name]["sha"] = sha
 
-                            raise typer.Exit(code=1) from e
+                    libs = sorted(
+                        str(path.relative_to(platform_path() / "lib"))
+                        for path in installed_binaries
+                        if path.is_relative_to(platform_path() / "lib")
+                    )
+                    if libs:
+                        installed["packages"][self.name]["libs"] = libs
 
-                        try:
-                            new_apps = sorted(
-                                f
-                                for f in (platform_path() / "bin").iterdir()
-                                if f.is_file() and f not in current_apps
-                            )
-                        except FileNotFoundError:
-                            new_apps = []
+                    apps = sorted(
+                        str(path.relative_to(platform_path() / "bin"))
+                        for path in installed_binaries
+                        if path.is_relative_to(platform_path() / "bin")
+                    )
+                    if apps:
+                        installed["packages"][self.name]["apps"] = apps
 
-                        try:
-                            new_libs = sorted(
-                                f
-                                for f in (platform_path() / "lib").iterdir()
-                                if f.is_file() and f not in current_libs
-                            )
-                        except FileNotFoundError:
-                            new_libs = []
+                    if self.requested_dependencies():
+                        installed["packages"][self.name]["requires"] = sorted(
+                            dep.name for dep in self.requested_dependencies()
+                        )
 
-                        if not installed:
-                            installed["version"] = 1
-                            installed["packages"] = {}
+                    if isinstance(self.origin, Path):
+                        installed["packages"][self.name]["origin"] = (
+                            self.origin.as_uri()
+                        )
+                    elif isinstance(self.origin, str):
+                        installed["packages"][self.name]["origin"] = self.origin
 
-                        installed["packages"][self.name] = {
-                            "apps": [app.name for app in new_apps],
-                            "libs": [lib.name for lib in new_libs],
-                        }
-                        if sha is not None:
-                            installed["packages"][self.name]["sha"] = sha
-                        if self.requested_dependencies():
-                            installed["packages"][self.name]["requires"] = [
-                                dep.name for dep in self.requested_dependencies()
-                            ]
-                        if isinstance(self.origin, Path):
-                            installed["packages"][self.name]["origin"] = (
-                                self.origin.as_uri()
-                            )
-                        elif isinstance(self.origin, str):
-                            installed["packages"][self.name]["origin"] = self.origin
+                    assert self.installed_binaries() == installed_binaries
+
+                assert self.is_installed()
+                assert self.installed_sha() == sha
 
                 self._upgrade_available = False
 
                 typer.echo(f"✅ Package '{self.name}' installed successfully.")
 
-                if new_libs:
+                if libs:
                     typer.echo("⚙️ New libraries:")
-                    for lib in new_libs:
-                        typer.echo(f"  {lib.name}")
+                    for lib in libs:
+                        typer.echo(f"  {lib}")
 
-                if new_apps:
+                if apps:
                     typer.echo("🖥️ New applications:")
-                    for app in new_apps:
-                        typer.echo(f"  {app.name}")
+                    for app in apps:
+                        typer.echo(f"  {app}")
 
             if isinstance(_deps, dict):
                 _deps[self].set()
@@ -605,13 +559,9 @@ class Package:
                 return
 
             with Status(f"⏳ Uninstalling {self.name}"):
-                for app in self.installed_apps():
+                for path in self.installed_binaries():
                     with contextlib.suppress(FileNotFoundError):
-                        app.unlink()
-
-                for lib in self.installed_libs():
-                    with contextlib.suppress(FileNotFoundError):
-                        lib.unlink()
+                        path.unlink()
 
                 if not _keep_pkg:
                     shutil.rmtree(
