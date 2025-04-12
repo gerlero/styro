@@ -95,13 +95,13 @@ class Package:
     def parse_package(
         package: str,
     ) -> Union[Tuple[str, None], Tuple[None, str], Tuple[str, str]]:
-        name = package.strip().lower().replace("_", "-")
+        name = package.lower().replace("_", "-")
         if Package.__name_regex.match(name):
             return name, None
         if "@" in package:
             name, origin = package.split("@", 1)
-            name = name.strip().lower().replace("_", "-")
-            origin = origin.strip()
+            name = name.rstrip().lower().replace("_", "-")
+            origin = origin.lstrip()
             if Package.__name_regex.match(name):
                 return name, origin
             typer.echo(
@@ -109,7 +109,7 @@ class Package:
                 err=True,
             )
             raise typer.Exit(code=1)
-        return None, package.strip()
+        return None, package
 
     @staticmethod
     def installed() -> Set["Package"]:
