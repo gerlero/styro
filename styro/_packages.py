@@ -74,7 +74,6 @@ lock = _lock()
 
 
 class Package:
-    __instances: ClassVar[Dict[str, "Package"]] = {}
     __install_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     __name_regex: ClassVar[re.Pattern] = re.compile(
         r"^(?!.*--)[a-z0-9]+(-[a-z0-9]+)*$",
@@ -105,8 +104,11 @@ class Package:
             origin = origin.strip()
             if Package.__name_regex.match(name):
                 return name, origin
-            msg = f"Invalid package name: {name}"
-            raise ValueError(msg)
+            typer.echo(
+                f"🛑 Error: Invalid package name: {name}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
         return None, package.strip()
 
     @staticmethod
@@ -181,37 +183,31 @@ class Package:
                 with contextlib.suppress(KeyError):
                     origin = installed["packages"][name]["origin"]
 
-            key = origin if origin is not None else name
-            assert key is not None
-
-            try:
-                return Package.__instances[key]
-            except KeyError:
-                if origin is not None and origin.startswith(("http://", "https://")):
-                    instance: Package = super().__new__(_GitPackage)
-                elif origin is not None:
-                    instance = super().__new__(_LocalPackage)
-                elif name == "styro":
-                    instance = super().__new__(_Styro)
-                else:
-                    instance = super().__new__(_IndexedPackage)
-
-                Package.__instances[key] = instance
-
-                return instance
+            if origin is not None:
+                if origin.startswith(("http://", "https://")):
+                    return super().__new__(_GitPackage)
+                return super().__new__(_LocalPackage)
+            if name == "styro":
+                return super().__new__(_Styro)
+            return super().__new__(_IndexedPackage)
 
     def __init__(self, name: str) -> None:
-        if not hasattr(self, "name"):
-            if not Package.__name_regex.match(name):
-                msg = f"Invalid package name: {name}"
-                raise ValueError(msg)
-            if name == "styro" and not isinstance(self, _Styro):
-                msg = "'styro' not allowed as a package name."
-                raise ValueError(msg)
-            self.name = name
-            self.origin: Optional[Union[str, Path]] = None
-            self._metadata: Optional[Dict[str, Any]] = None
-            self._upgrade_available = False
+        if not Package.__name_regex.match(name):
+            typer.echo(
+                f"🛑 Error: Invalid package name: {name}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if name == "styro" and not isinstance(self, _Styro):
+            typer.echo(
+                "🛑 Error: 'styro' not allowed as a package name.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        self.name = name
+        self.origin: Optional[Union[str, Path]] = None
+        self._metadata: Optional[Dict[str, Any]] = None
+        self._upgrade_available = False
 
     def _build_steps(self) -> List[str]:
         assert self._metadata is not None
