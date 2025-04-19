@@ -35,7 +35,7 @@ jobs:
         python-version-file: pyproject.toml
     - name: Check types with mypy
       run: |
-        uv run --extra typing mypy
+        uv run mypy
 
   test:
     runs-on: ${{ matrix.os }}
@@ -73,7 +73,7 @@ jobs:
         openfoam-version: ${{ matrix.openfoam-version }}
     - name: Install test dependencies
       run: |
-        uv sync --extra test
+        uv sync
     - name: Test with pytest
       run: |
         uv run pytest --cov=styro --cov-report xml
