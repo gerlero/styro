@@ -1,4 +1,4 @@
-<img src="https://github.com/gerlero/styro/raw/main/logo.png)" alt="styro"  width="200"/>
+<img src="https://github.com/gerlero/styro/raw/main/logo.png" alt="styro"  width="200"/>
 
 **A community package manager for OpenFOAM**
 
