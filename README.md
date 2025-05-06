@@ -1,4 +1,6 @@
-# 🏗️ `styro`: A community package manager for OpenFOAM
+<img src="https://github.com/gerlero/styro/raw/main/logo.png)" alt="styro"  width="200"/>
+
+**A community package manager for OpenFOAM**
 
 [![CI](https://github.com/gerlero/styro/actions/workflows/ci.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/ci.yml)
 [![Codecov](https://codecov.io/gh/gerlero/styro/branch/main/graph/badge.svg)](https://codecov.io/gh/gerlero/styro)
