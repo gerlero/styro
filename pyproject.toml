@@ -39,11 +39,11 @@ dynamic = ["version"]
 
 [dependency-groups]
 dev = [
-    "mypy>=1,<2",
     "pyinstaller>=5,<7",
     "pytest>7,<9",
     "pytest-cov",
     "ruff",
+    "ty; python_version>='3.8'",
 ]
 
 [project.urls]

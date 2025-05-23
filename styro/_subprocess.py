@@ -23,7 +23,7 @@ async def run(
     env: Optional[Dict[str, str]] = None,
     status: Optional[Status] = None,
 ) -> subprocess.CompletedProcess:
-    proc = await asyncio.create_subprocess_exec(
+    proc = await asyncio.create_subprocess_exec(  # ty: ignore[missing-argument]
         *cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
