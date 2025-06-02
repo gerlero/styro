@@ -30,7 +30,7 @@ classifiers = [
 
 dependencies = [
     "aiohttp>=3,<4",
-    "typer-slim>=0.13,<0.16",
+    "typer-slim>=0.13,<0.17",
     "typing_extensions>=3.9,<5; python_version < '3.9'",
 ]
 
