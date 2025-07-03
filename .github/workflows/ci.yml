@@ -42,7 +42,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        openfoam-version: [9, 12, 2112, 2412]
+        openfoam-version: [9, 12, 2112, 2506]
         python-version: ['3.7', '3.13']
         include:
           - os: macos-latest
@@ -52,10 +52,10 @@ jobs:
             openfoam-version: 2112
             python-version: '3.13'
           - os: macos-latest
-            openfoam-version: 2412
+            openfoam-version: 2506
             python-version: '3.9'
           - os: macos-latest
-            openfoam-version: 2412
+            openfoam-version: 2506
             python-version: '3.13'
       fail-fast: false
     steps:
