@@ -38,7 +38,7 @@ def test_install(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "reagency" in result.stdout
 
-    run(  # noqa: S603
+    run(
         ["git", "clone", "https://github.com/gerlero/reagency.git"],  # noqa: S607
         cwd=tmp_path,
         check=True,
