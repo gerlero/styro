@@ -46,36 +46,23 @@ def openfoam_version() -> int:
 
 @contextmanager
 def get_changed_binaries() -> Generator[Set[Path], None, None]:
-    # Create context managers but don't enter them yet
-    bin_context = get_changed_files(platform_path() / "bin")
-    lib_context = get_changed_files(platform_path() / "lib")
+    from contextlib import ExitStack
     
-    # Enter the contexts and get the sets
-    changed_binaries = bin_context.__enter__()
-    changed_libraries = lib_context.__enter__()
-    
-    # Create the result set that will be returned to the user
     ret: Set[Path] = set()
+    changed_binaries = None
+    changed_libraries = None
     
     try:
-        yield ret
-    finally:
-        try:
-            # Exit the nested contexts first (this populates the change sets)
-            lib_context.__exit__(None, None, None)
-            bin_context.__exit__(None, None, None)
+        # Use ExitStack to manage multiple contexts cleanly
+        with ExitStack() as stack:
+            changed_binaries = stack.enter_context(get_changed_files(platform_path() / "bin"))
+            changed_libraries = stack.enter_context(get_changed_files(platform_path() / "lib"))
             
-            # Now update our result set with the detected changes
+            yield ret
+            
+        # After ExitStack exits normally, contexts are populated
+    finally:
+        # Update result with detected changes (works for both normal and exception cases)
+        if changed_binaries is not None and changed_libraries is not None:
             ret.update(changed_binaries)
             ret.update(changed_libraries)
-        except Exception:
-            # Make sure we clean up the contexts even if something goes wrong
-            try:
-                lib_context.__exit__(None, None, None)
-            except Exception:
-                pass
-            try:
-                bin_context.__exit__(None, None, None)
-            except Exception:
-                pass
-            raise
