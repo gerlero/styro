@@ -136,63 +136,60 @@ class Package:
     async def _detect_cycles(pkgs: Set["Package"]) -> None:
         """
         Detect cycles in the dependency graph before installation.
-        
+
         Uses depth-first search with three states:
         - unvisited (white): package not yet visited
         - visiting (gray): package currently being processed
         - visited (black): package and all its dependencies processed
-        
+
         Raises typer.Exit if a cycle is detected.
         """
+
         class State(Enum):
             UNVISITED = 0
             VISITING = 1
             VISITED = 2
-        
-        states: Dict["Package", State] = {}
-        path: List["Package"] = []
-        
-        async def visit(pkg: "Package") -> None:
+
+        states: Dict[Package, State] = {}
+        path: List[Package] = []
+
+        async def visit(pkg: Package) -> None:
             if states.get(pkg, State.UNVISITED) == State.VISITED:
                 return
-            
+
             if states.get(pkg, State.UNVISITED) == State.VISITING:
                 # Found a cycle - construct the cycle path
                 cycle_start_idx = path.index(pkg)
-                cycle = path[cycle_start_idx:] + [pkg]
+                cycle = [*path[cycle_start_idx:], pkg]
                 cycle_names = " -> ".join(p.name for p in cycle)
-                
+
                 typer.secho(
                     f"❌ Dependency cycle detected: {cycle_names}",
                     fg=typer.colors.RED,
                     err=True,
                 )
                 raise typer.Exit(code=1)
-            
+
             states[pkg] = State.VISITING
             path.append(pkg)
-            
+
             # Check if we need to fetch metadata to get dependencies
             if pkg._metadata is None:
-                try:
+                with contextlib.suppress(Exception):
                     await pkg.fetch()
-                except Exception:
-                    # If we can't fetch metadata, skip dependency checking for this package
-                    # This allows the cycle detection to be best-effort
-                    pass
-            
+
             # Visit requested dependencies if metadata is available
             if pkg._metadata is not None:
                 for dep in pkg.requested_dependencies():
                     await visit(dep)
-            
+
             # Visit installed dependents (reverse dependencies)
             for dependent in pkg.installed_dependents():
                 await visit(dependent)
-            
+
             path.pop()
             states[pkg] = State.VISITED
-        
+
         # Start DFS from all root packages
         for pkg in pkgs:
             if states.get(pkg, State.UNVISITED) == State.UNVISITED:
@@ -206,7 +203,7 @@ class Package:
         upgrade: bool = False,
     ) -> Set["Package"]:
         Package._check_for_duplicate_names(pkgs)
-        
+
         # Detect cycles before attempting resolution
         await Package._detect_cycles(pkgs)
 
