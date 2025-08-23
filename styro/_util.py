@@ -94,6 +94,14 @@ def get_changed_files(path: Path) -> Generator[Set[Path], None, None]:
     try:
         yield ret
     finally:
-        for file in path.rglob("*"):
-            if file.is_file() and file.stat().st_mtime != before.get(file):
+        after_files = {file for file in path.rglob("*") if file.is_file()}
+        before_files = set(before.keys())
+        
+        # Add newly created files (files that exist now but didn't before)
+        new_files = after_files - before_files
+        ret.update(new_files)
+        
+        # Add modified files (files that existed before but have different timestamps)
+        for file in after_files & before_files:
+            if file.stat().st_mtime != before[file]:
                 ret.add(file)
