@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from styro import __version__
 from styro.__main__ import app
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 
 def test_styro() -> None:
@@ -18,7 +18,7 @@ def test_styro() -> None:
 
     result = runner.invoke(app, ["uninstall", "styro"])
     assert result.exit_code != 0
-    assert "styro" in result.stdout
+    assert "styro" in (result.stdout + (result.stderr or ""))
 
 
 @pytest.mark.skipif(
@@ -28,7 +28,7 @@ def test_styro() -> None:
 def test_install(tmp_path: Path) -> None:
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    assert "reagency" in (result.stdout + (result.stderr or ""))
 
     result = runner.invoke(app, ["install", "reagency"])
     assert result.exit_code == 0
@@ -76,7 +76,7 @@ def test_install(tmp_path: Path) -> None:
 def test_package_with_dependencies() -> None:
     result = runner.invoke(app, ["uninstall", "porousmicrotransport", "reagency"])
     assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
+    assert "porousmicrotransport" in (result.stdout + (result.stderr or ""))
 
     result = runner.invoke(app, ["install", "porousmicrotransport"])
     assert result.exit_code == 0
@@ -89,8 +89,8 @@ def test_package_with_dependencies() -> None:
 
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code != 0
-    assert "porousmicrotransport" in result.stdout
-    assert "reagency" in result.stdout
+    assert "porousmicrotransport" in (result.stdout + (result.stderr or ""))
+    assert "reagency" in (result.stdout + (result.stderr or ""))
 
 
 def test_version() -> None:
