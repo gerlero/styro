@@ -8,14 +8,12 @@ from typer.testing import CliRunner
 from styro import __version__
 from styro.__main__ import app
 
-# Try to create CliRunner with mix_stderr=False for separate stderr capture
-# Fall back to default CliRunner if the parameter is not supported
+# Try to create CliRunner with mix_stderr=True to explicitly mix stderr into stdout
+# Fall back to default CliRunner if the parameter is not supported (also mixes by default)
 try:
-    runner = CliRunner(mix_stderr=False)
-    _STDERR_SEPARATE = True
+    runner: CliRunner = CliRunner(mix_stderr=True)
 except TypeError:
     runner = CliRunner()
-    _STDERR_SEPARATE = False
 
 
 def test_styro() -> None:
@@ -25,10 +23,7 @@ def test_styro() -> None:
 
     result = runner.invoke(app, ["uninstall", "styro"])
     assert result.exit_code != 0
-    if _STDERR_SEPARATE:
-        assert "styro" in result.stderr
-    else:
-        assert "styro" in result.stdout
+    assert "styro" in result.stdout
 
 
 @pytest.mark.skipif(
@@ -38,10 +33,7 @@ def test_styro() -> None:
 def test_install(tmp_path: Path) -> None:
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code == 0
-    if _STDERR_SEPARATE:
-        assert "reagency" in result.stderr
-    else:
-        assert "reagency" in result.stdout
+    assert "reagency" in result.stdout
 
     result = runner.invoke(app, ["install", "reagency"])
     assert result.exit_code == 0
@@ -89,10 +81,7 @@ def test_install(tmp_path: Path) -> None:
 def test_package_with_dependencies() -> None:
     result = runner.invoke(app, ["uninstall", "porousmicrotransport", "reagency"])
     assert result.exit_code == 0
-    if _STDERR_SEPARATE:
-        assert "porousmicrotransport" in result.stderr
-    else:
-        assert "porousmicrotransport" in result.stdout
+    assert "porousmicrotransport" in result.stdout
 
     result = runner.invoke(app, ["install", "porousmicrotransport"])
     assert result.exit_code == 0
@@ -105,12 +94,8 @@ def test_package_with_dependencies() -> None:
 
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code != 0
-    if _STDERR_SEPARATE:
-        assert "porousmicrotransport" in result.stderr
-        assert "reagency" in result.stderr
-    else:
-        assert "porousmicrotransport" in result.stdout
-        assert "reagency" in result.stdout
+    assert "porousmicrotransport" in result.stdout
+    assert "reagency" in result.stdout
 
 
 def test_version() -> None:
