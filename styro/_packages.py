@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from copy import deepcopy
+from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
 
@@ -143,8 +144,6 @@ class Package:
         
         Raises typer.Exit if a cycle is detected.
         """
-        from enum import Enum
-        
         class State(Enum):
             UNVISITED = 0
             VISITING = 1
