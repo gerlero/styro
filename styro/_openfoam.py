@@ -49,15 +49,19 @@ def get_changed_binaries() -> Generator[Set[Path], None, None]:
     ret: Set[Path] = set()
     changed_binaries = None
     changed_libraries = None
-    
+
     try:
         # Use ExitStack to manage multiple contexts cleanly
         with ExitStack() as stack:
-            changed_binaries = stack.enter_context(get_changed_files(platform_path() / "bin"))
-            changed_libraries = stack.enter_context(get_changed_files(platform_path() / "lib"))
-            
+            changed_binaries = stack.enter_context(
+                get_changed_files(platform_path() / "bin")
+            )
+            changed_libraries = stack.enter_context(
+                get_changed_files(platform_path() / "lib")
+            )
+
             yield ret
-            
+
         # After ExitStack exits normally, contexts are populated
     finally:
         # Update result with detected changes (works for both normal and exception cases)
