@@ -89,7 +89,7 @@ def test_package_with_dependencies() -> None:
 
     result = runner.invoke(app, ["uninstall", "reagency"])
     assert result.exit_code != 0
-    assert "porousmicrotransport" in (result.stdout + (result.stderr or ""))
+    assert "porousmicrotransport" in result.stderr
     assert "reagency" in result.stderr
 
 
