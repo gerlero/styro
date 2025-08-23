@@ -1,6 +1,6 @@
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Set
 
@@ -46,14 +46,25 @@ def openfoam_version() -> int:
 
 @contextmanager
 def get_changed_binaries() -> Generator[Set[Path], None, None]:
-    with get_changed_files(
-        platform_path() / "bin"
-    ) as changed_binaries, get_changed_files(
-        platform_path() / "lib"
-    ) as changed_libraries:
-        ret: Set[Path] = set()
-        try:
+    ret: Set[Path] = set()
+    changed_binaries = None
+    changed_libraries = None
+
+    try:
+        # Use ExitStack to manage multiple contexts cleanly
+        with ExitStack() as stack:
+            changed_binaries = stack.enter_context(
+                get_changed_files(platform_path() / "bin")
+            )
+            changed_libraries = stack.enter_context(
+                get_changed_files(platform_path() / "lib")
+            )
+
             yield ret
-        finally:
+
+        # After ExitStack exits normally, contexts are populated
+    finally:
+        # Update result with detected changes (works for both normal and exception cases)
+        if changed_binaries is not None and changed_libraries is not None:
             ret.update(changed_binaries)
             ret.update(changed_libraries)
