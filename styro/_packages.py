@@ -683,7 +683,7 @@ class _LocalPackage(Package):
             path = Path(origin).absolute()
 
         if name is None:
-            name = path.name
+            name = path.name.lower().replace("_", "-")
 
         super().__init__(name)
         self.origin = path
