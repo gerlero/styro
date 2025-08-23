@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from styro import __version__
 from styro.__main__ import app
 
-runner = CliRunner(mix_stderr=False)
+runner = CliRunner(mix_stderr=False)  # ty: ignore [unknown-argument]
 
 
 def test_styro() -> None:
