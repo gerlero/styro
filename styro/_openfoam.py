@@ -46,14 +46,36 @@ def openfoam_version() -> int:
 
 @contextmanager
 def get_changed_binaries() -> Generator[Set[Path], None, None]:
-    with get_changed_files(
-        platform_path() / "bin"
-    ) as changed_binaries, get_changed_files(
-        platform_path() / "lib"
-    ) as changed_libraries:
-        ret: Set[Path] = set()
+    # Create context managers but don't enter them yet
+    bin_context = get_changed_files(platform_path() / "bin")
+    lib_context = get_changed_files(platform_path() / "lib")
+    
+    # Enter the contexts and get the sets
+    changed_binaries = bin_context.__enter__()
+    changed_libraries = lib_context.__enter__()
+    
+    # Create the result set that will be returned to the user
+    ret: Set[Path] = set()
+    
+    try:
+        yield ret
+    finally:
         try:
-            yield ret
-        finally:
+            # Exit the nested contexts first (this populates the change sets)
+            lib_context.__exit__(None, None, None)
+            bin_context.__exit__(None, None, None)
+            
+            # Now update our result set with the detected changes
             ret.update(changed_binaries)
             ret.update(changed_libraries)
+        except Exception:
+            # Make sure we clean up the contexts even if something goes wrong
+            try:
+                lib_context.__exit__(None, None, None)
+            except Exception:
+                pass
+            try:
+                bin_context.__exit__(None, None, None)
+            except Exception:
+                pass
+            raise
