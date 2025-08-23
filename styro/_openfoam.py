@@ -1,6 +1,6 @@
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Set
 
@@ -46,8 +46,6 @@ def openfoam_version() -> int:
 
 @contextmanager
 def get_changed_binaries() -> Generator[Set[Path], None, None]:
-    from contextlib import ExitStack
-    
     ret: Set[Path] = set()
     changed_binaries = None
     changed_libraries = None
