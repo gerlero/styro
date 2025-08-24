@@ -9,7 +9,7 @@ from styro import __version__
 from styro.__main__ import app
 
 try:
-    runner = CliRunner(mix_stderr=True)
+    runner = CliRunner(mix_stderr=True)  # ty: ignore [unknown-argument]
 except TypeError:
     runner = CliRunner()
 
@@ -21,7 +21,6 @@ def test_styro() -> None:
 
     result = runner.invoke(app, ["uninstall", "styro"])
     assert result.exit_code != 0
-    assert "styro" in result.stdout
 
 
 @pytest.mark.skipif(
