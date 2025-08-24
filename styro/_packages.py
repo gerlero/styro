@@ -153,7 +153,7 @@ class Package:
         states: Dict[Package, State] = {}
         path: List[Package] = []
 
-        async def visit(pkg: Package, pkg_upgrade: bool = False, pkg_force_reinstall: bool = False) -> None:
+        async def visit(pkg: Package, *, pkg_upgrade: bool = False, pkg_force_reinstall: bool = False) -> None:
             if states.get(pkg, State.UNVISITED) == State.VISITED:
                 return
 
@@ -196,14 +196,16 @@ class Package:
                 states[pkg] = State.VISITED
                 return
 
-            # Visit requested dependencies if metadata is available (with upgrade=True)
+            # Only visit dependencies if the package actually needs resolution
+            # This mirrors the resolve() method logic exactly
             if pkg._metadata is not None:
+                # Visit requested dependencies (with upgrade=True)
                 for dep in pkg.requested_dependencies():
                     await visit(dep, pkg_upgrade=True, pkg_force_reinstall=False)
 
-            # Visit installed dependents (reverse dependencies) with force_reinstall=True
-            for dependent in pkg.installed_dependents():
-                await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
+                # Visit installed dependents (reverse dependencies) with force_reinstall=True
+                for dependent in pkg.installed_dependents():
+                    await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
 
             path.pop()
             states[pkg] = State.VISITED
