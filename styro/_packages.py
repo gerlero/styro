@@ -153,7 +153,12 @@ class Package:
         states: Dict[Package, State] = {}
         path: List[Package] = []
 
-        async def visit(pkg: Package, *, pkg_upgrade: bool = False, pkg_force_reinstall: bool = False) -> None:
+        async def visit(
+            pkg: Package,
+            *,
+            pkg_upgrade: bool = False,
+            pkg_force_reinstall: bool = False,
+        ) -> None:
             if states.get(pkg, State.UNVISITED) == State.VISITED:
                 return
 
@@ -175,7 +180,11 @@ class Package:
 
             # Follow the same logic as resolve() method
             # Early return if package is already installed and no upgrade/force reinstall
-            if pkg.installed_sha() is not None and not pkg_upgrade and not pkg_force_reinstall:
+            if (
+                pkg.installed_sha() is not None
+                and not pkg_upgrade
+                and not pkg_force_reinstall
+            ):
                 path.pop()
                 states[pkg] = State.VISITED
                 return
