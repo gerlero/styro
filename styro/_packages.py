@@ -133,7 +133,7 @@ class Package:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
-    async def _detect_cycles(pkgs: Set["Package"]) -> None:
+    async def _detect_cycles(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
         """
         Detect cycles in the dependency graph before installation.
 
@@ -153,7 +153,7 @@ class Package:
         states: Dict[Package, State] = {}
         path: List[Package] = []
 
-        async def visit(pkg: Package) -> None:
+        async def visit(pkg: Package, pkg_upgrade: bool = False, pkg_force_reinstall: bool = False) -> None:
             if states.get(pkg, State.UNVISITED) == State.VISITED:
                 return
 
@@ -173,27 +173,45 @@ class Package:
             states[pkg] = State.VISITING
             path.append(pkg)
 
+            # Follow the same logic as resolve() method
+            # Early return if package is already installed and no upgrade/force reinstall
+            if pkg.installed_sha() is not None and not pkg_upgrade and not pkg_force_reinstall:
+                path.pop()
+                states[pkg] = State.VISITED
+                return
+
             # Check if we need to fetch metadata to get dependencies
             if pkg._metadata is None:
                 with contextlib.suppress(Exception):
                     await pkg.fetch()
 
-            # Visit requested dependencies if metadata is available
+            # Check again after potential fetch
+            if (
+                pkg._metadata is not None
+                and pkg.installed_sha() is not None
+                and not pkg._upgrade_available
+                and not pkg_force_reinstall
+            ):
+                path.pop()
+                states[pkg] = State.VISITED
+                return
+
+            # Visit requested dependencies if metadata is available (with upgrade=True)
             if pkg._metadata is not None:
                 for dep in pkg.requested_dependencies():
-                    await visit(dep)
+                    await visit(dep, pkg_upgrade=True, pkg_force_reinstall=False)
 
-            # Visit installed dependents (reverse dependencies)
+            # Visit installed dependents (reverse dependencies) with force_reinstall=True
             for dependent in pkg.installed_dependents():
-                await visit(dependent)
+                await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
 
             path.pop()
             states[pkg] = State.VISITED
 
-        # Start DFS from all root packages
+        # Start DFS from all root packages with the provided upgrade setting
         for pkg in pkgs:
             if states.get(pkg, State.UNVISITED) == State.UNVISITED:
-                await visit(pkg)
+                await visit(pkg, pkg_upgrade=upgrade, pkg_force_reinstall=False)
 
     @staticmethod
     @lock
@@ -205,7 +223,7 @@ class Package:
         Package._check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
-        await Package._detect_cycles(pkgs)
+        await Package._detect_cycles(pkgs, upgrade=upgrade)
 
         resolved: Set[Package] = set()
         return {
