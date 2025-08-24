@@ -8,12 +8,9 @@ from typer.testing import CliRunner
 from styro import __version__
 from styro.__main__ import app
 
-# Try to create CliRunner with mix_stderr=True to explicitly mix stderr into stdout
-# Fall back to default CliRunner if the parameter is not supported (also mixes by default)
-try:
-    runner: CliRunner = CliRunner(mix_stderr=True)
-except TypeError:
-    runner = CliRunner()
+# Use default CliRunner which mixes stderr into stdout by default
+# This ensures compatibility across all Python versions and typer-slim versions
+runner: CliRunner = CliRunner()
 
 
 def test_styro() -> None:
