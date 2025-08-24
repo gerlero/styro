@@ -26,11 +26,6 @@ This directory contains comprehensive tests for the styro package manager using 
    - Upgrade and reinstall scenarios
    - Error handling validation
 
-4. **`test_runner.py`** - Simple test runner for pytest-less environments
-   - Self-contained test runner
-   - Basic functionality verification
-   - Async test support
-
 ## Test Categories
 
 ### Basic Functionality Tests
@@ -64,35 +59,26 @@ This directory contains comprehensive tests for the styro package manager using 
 
 ## Running the Tests
 
-### Option 1: Individual Test Files
+All tests are designed to work with pytest. Make sure you have pytest installed:
+
 ```bash
-# Run basic mock package tests
-python test_mock_packages.py
-
-# Run integration tests
-python test_integration_mocks.py
-
-# Run CLI integration tests
-python test_cli_integration.py
-
-# Run simple test runner
-python test_runner.py
+pip install pytest pytest-asyncio
 ```
 
-### Option 2: All Tests at Once
+### Run All Tests
 ```bash
-# Run all test files sequentially
-python test_mock_packages.py && \
-python test_integration_mocks.py && \
-python test_cli_integration.py && \
-python test_runner.py
+# Run all tests with pytest
+pytest -v
+
+# Run with coverage
+pytest --cov=styro -v
 ```
 
-### Option 3: With pytest (if available)
+### Run Specific Test Files
 ```bash
-# Run with pytest for more detailed output
+# Run specific test file
 pytest test_mock_packages.py -v
-pytest test_integration_mocks.py -v
+pytest test_integration_mocks.py -v  
 pytest test_cli_integration.py -v
 ```
 

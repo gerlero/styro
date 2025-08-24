@@ -8,32 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from unittest.mock import patch, MagicMock
 
-try:
-    import pytest
-    HAS_PYTEST = True
-except ImportError:
-    HAS_PYTEST = False
-    class MockPytest:
-        class mark:
-            @staticmethod
-            def skipif(*args, **kwargs):
-                def decorator(func):
-                    return func
-                return decorator
-            
-            @staticmethod  
-            def asyncio(func):
-                return func
-        
-        @staticmethod
-        def raises(*args, **kwargs):
-            class MockRaises:
-                def __enter__(self):
-                    return self
-                def __exit__(self, exc_type, exc_val, exc_tb):
-                    return False
-            return MockRaises()
-    pytest = MockPytest()
+import pytest
 
 import typer
 from typer.testing import CliRunner
@@ -361,70 +336,6 @@ class TestErrorHandling:
                     # the cycle path: package-a -> package-b -> package-c -> package-a
 
 
-def run_simple_integration_tests():
-    """Run basic integration tests without pytest."""
-    print("Running simple integration tests...")
-    print("=" * 50)
-    
-    try:
-        with patch('styro._packages.platform_path', return_value=get_mock_platform_path()):
-            # Test basic package operations
-            pkg = MockPackageWithCLI("test-package")
-            pkg.set_metadata({"requires": []})
-            
-            # Test installation simulation
-            asyncio.run(pkg.install())
-            assert pkg.is_installed()
-            print("✓ Installation simulation test passed")
-            
-            # Test uninstallation simulation
-            asyncio.run(pkg.uninstall())
-            assert not pkg.is_installed()
-            print("✓ Uninstallation simulation test passed")
-            
-            # Test complex dependency resolution
-            async def test_complex_deps():
-                pkg_a = MockPackageWithCLI("package-a")
-                pkg_b = MockPackageWithCLI("package-b")
-                pkg_c = MockPackageWithCLI("package-c")
-                
-                pkg_a.set_metadata({"requires": ["package-b", "package-c"]})
-                pkg_b.set_metadata({"requires": []})
-                pkg_c.set_metadata({"requires": []})
-                
-                await pkg_a.fetch()
-                await pkg_b.fetch()
-                await pkg_c.fetch()
-                
-                # Mock dependencies for diamond pattern
-                with patch.object(pkg_a, 'requested_dependencies', return_value={pkg_b, pkg_c}), \
-                     patch.object(pkg_b, 'requested_dependencies', return_value=set()), \
-                     patch.object(pkg_c, 'requested_dependencies', return_value=set()), \
-                     patch.object(pkg_a, 'installed_dependents', return_value=set()), \
-                     patch.object(pkg_b, 'installed_dependents', return_value=set()), \
-                     patch.object(pkg_c, 'installed_dependents', return_value=set()):
-                    
-                    # Should not detect cycles in diamond pattern
-                    await Package._detect_cycles({pkg_a})
-                    
-            asyncio.run(test_complex_deps())
-            print("✓ Complex dependency resolution test passed")
-            
-        print("=" * 50)
-        print("✅ All integration tests passed!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Integration test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 
-if __name__ == "__main__":
-    if HAS_PYTEST:
-        pytest.main([__file__, "-v"])
-    else:
-        import sys
-        success = run_simple_integration_tests()
-        sys.exit(0 if success else 1)
+

@@ -12,24 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Set
 from unittest.mock import AsyncMock, MagicMock, patch
 
-try:
-    import pytest
-    HAS_PYTEST = True
-except ImportError:
-    # Mock pytest if not available
-    HAS_PYTEST = False
-    class MockPytest:
-        class mark:
-            @staticmethod
-            def skipif(*args, **kwargs):
-                def decorator(func):
-                    return func
-                return decorator
-            
-            @staticmethod  
-            def asyncio(func):
-                return func
-    pytest = MockPytest()
+import pytest
 
 import typer
 from typer.testing import CliRunner
@@ -89,7 +72,6 @@ def get_mock_platform_path():
     return mock_path
 
 
-@pytest.mark.skipif(not HAS_PYTEST, reason="pytest not available")
 class TestMockPackages:
     """Test basic functionality with mock packages."""
     
@@ -142,7 +124,6 @@ class TestMockPackages:
             assert dep_names == {"dep1", "dep2"}
 
 
-@pytest.mark.skipif(not HAS_PYTEST, reason="pytest not available")
 class TestDependencyResolution:
     """Test dependency resolution with mock packages."""
     
@@ -187,7 +168,6 @@ class TestDependencyResolution:
                     mock_dep2_resolve.assert_called_once()
 
 
-@pytest.mark.skipif(not HAS_PYTEST, reason="pytest not available")
 class TestCycleDetection:
     """Test dependency cycle detection with mock packages."""
     
@@ -297,7 +277,6 @@ class TestCycleDetection:
                 assert exc_info.value.exit_code == 1
 
 
-@pytest.mark.skipif(not HAS_PYTEST, reason="pytest not available")
 class TestEdgeCases:
     """Test edge cases involving reinstalling and updating packages."""
     
@@ -434,81 +413,6 @@ class TestEdgeCases:
 
 
 # Simple test runner for when pytest is not available
-def run_simple_tests():
-    """Run basic tests without pytest."""
-    print("Running simple mock package tests (no pytest)...")
-    print("=" * 50)
-    
-    try:
-        # Basic package creation test
-        with patch('styro._packages.platform_path', return_value=get_mock_platform_path()):
-            pkg = MockPackage("test-package")
-            assert pkg.name == "test-package"
-            assert not pkg.is_installed()
-            print("✓ Basic package creation test passed")
-            
-            # Test with metadata
-            pkg.set_metadata({"requires": ["dep1"]})
-            assert pkg._test_metadata == {"requires": ["dep1"]}
-            print("✓ Package metadata test passed")
-            
-            # Test cycle detection (no cycle)
-            async def test_no_cycle():
-                pkg_a = MockPackage("package-a")
-                pkg_b = MockPackage("package-b")
-                pkg_a.set_metadata({"requires": ["package-b"]})
-                pkg_b.set_metadata({})
-                
-                await pkg_a.fetch()
-                await pkg_b.fetch()
-                
-                with patch.object(pkg_a, 'requested_dependencies', return_value={pkg_b}), \
-                     patch.object(pkg_b, 'requested_dependencies', return_value=set()), \
-                     patch.object(pkg_a, 'installed_dependents', return_value=set()), \
-                     patch.object(pkg_b, 'installed_dependents', return_value=set()):
-                    await Package._detect_cycles({pkg_a})
-                    
-            asyncio.run(test_no_cycle())
-            print("✓ Cycle detection (no cycle) test passed")
-            
-            # Test cycle detection (with cycle)
-            async def test_with_cycle():
-                pkg_a = MockPackage("package-a")
-                pkg_b = MockPackage("package-b")
-                pkg_a.set_metadata({"requires": ["package-b"]})
-                pkg_b.set_metadata({"requires": ["package-a"]})
-                
-                await pkg_a.fetch()
-                await pkg_b.fetch()
-                
-                with patch.object(pkg_a, 'requested_dependencies', return_value={pkg_b}), \
-                     patch.object(pkg_b, 'requested_dependencies', return_value={pkg_a}), \
-                     patch.object(pkg_a, 'installed_dependents', return_value=set()), \
-                     patch.object(pkg_b, 'installed_dependents', return_value=set()):
-                    try:
-                        await Package._detect_cycles({pkg_a})
-                        assert False, "Should have detected cycle"
-                    except typer.Exit as e:
-                        assert e.exit_code == 1
-                        
-            asyncio.run(test_with_cycle())
-            print("✓ Cycle detection (with cycle) test passed")
-            
-        print("=" * 50)
-        print("✅ All simple tests passed!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 
-if __name__ == "__main__":
-    if HAS_PYTEST:
-        pytest.main([__file__, "-v"])
-    else:
-        import sys
-        success = run_simple_tests()
-        sys.exit(0 if success else 1)
+

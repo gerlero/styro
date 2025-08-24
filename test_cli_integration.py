@@ -372,30 +372,6 @@ def test_complex_dependency_resolution():
         print("✓ Complex dependency resolution test passed")
 
 
-def main():
-    """Run all CLI integration tests."""
-    print("Running CLI Integration Tests with Mock Packages")
-    print("=" * 60)
-    
-    try:
-        test_cli_basic_commands()
-        test_cli_mock_package_operations()
-        test_dependency_scenarios_with_cycles()
-        test_upgrade_and_reinstall_scenarios()
-        test_complex_dependency_resolution()
-        
-        print("=" * 60)
-        print("✅ All CLI integration tests passed!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ CLI integration test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 
-if __name__ == "__main__":
-    import sys
-    success = main()
-    sys.exit(0 if success else 1)
+
