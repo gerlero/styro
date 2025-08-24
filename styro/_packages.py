@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from copy import deepcopy
+from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
 
@@ -132,6 +133,98 @@ class Package:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
+    async def _detect_cycles(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
+        """
+        Detect cycles in the dependency graph before installation.
+
+        Uses depth-first search with three states:
+        - unvisited (white): package not yet visited
+        - visiting (gray): package currently being processed
+        - visited (black): package and all its dependencies processed
+
+        Raises typer.Exit if a cycle is detected.
+        """
+
+        class State(Enum):
+            UNVISITED = 0
+            VISITING = 1
+            VISITED = 2
+
+        states: Dict[Package, State] = {}
+        path: List[Package] = []
+
+        async def visit(
+            pkg: Package,
+            *,
+            pkg_upgrade: bool = False,
+            pkg_force_reinstall: bool = False,
+        ) -> None:
+            if states.get(pkg, State.UNVISITED) == State.VISITED:
+                return
+
+            if states.get(pkg, State.UNVISITED) == State.VISITING:
+                # Found a cycle - construct the cycle path
+                cycle_start_idx = path.index(pkg)
+                cycle = [*path[cycle_start_idx:], pkg]
+                cycle_names = " -> ".join(p.name for p in cycle)
+
+                typer.secho(
+                    f"❌ Dependency cycle detected: {cycle_names}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+
+            states[pkg] = State.VISITING
+            path.append(pkg)
+
+            # Follow the same logic as resolve() method
+            # Early return if package is already installed and no upgrade/force reinstall
+            if (
+                pkg.installed_sha() is not None
+                and not pkg_upgrade
+                and not pkg_force_reinstall
+            ):
+                path.pop()
+                states[pkg] = State.VISITED
+                return
+
+            # Check if we need to fetch metadata to get dependencies
+            if pkg._metadata is None:
+                with contextlib.suppress(Exception):
+                    await pkg.fetch()
+
+            # Check again after potential fetch
+            if (
+                pkg._metadata is not None
+                and pkg.installed_sha() is not None
+                and not pkg._upgrade_available
+                and not pkg_force_reinstall
+            ):
+                path.pop()
+                states[pkg] = State.VISITED
+                return
+
+            # Only visit dependencies if the package actually needs resolution
+            # This mirrors the resolve() method logic exactly
+            if pkg._metadata is not None:
+                # Visit requested dependencies (with upgrade=True)
+                for dep in pkg.requested_dependencies():
+                    await visit(dep, pkg_upgrade=True, pkg_force_reinstall=False)
+
+                # Visit installed dependents (reverse dependencies) with force_reinstall=True
+                for dependent in pkg.installed_dependents():
+                    await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
+
+            path.pop()
+            states[pkg] = State.VISITED
+
+        # Start DFS from all root packages with the provided upgrade setting
+        for pkg in pkgs:
+            if states.get(pkg, State.UNVISITED) == State.UNVISITED:
+                await visit(pkg, pkg_upgrade=upgrade, pkg_force_reinstall=False)
+
+    @staticmethod
     @lock
     async def resolve_all(
         pkgs: Set["Package"],
@@ -139,6 +232,9 @@ class Package:
         upgrade: bool = False,
     ) -> Set["Package"]:
         Package._check_for_duplicate_names(pkgs)
+
+        # Detect cycles before attempting resolution
+        await Package._detect_cycles(pkgs, upgrade=upgrade)
 
         resolved: Set[Package] = set()
         return {
