@@ -6,7 +6,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Optional
+from typing import Any, ClassVar, Dict, Optional, Set
 from unittest.mock import patch
 
 import typer
@@ -347,7 +347,19 @@ def test_complex_dependency_resolution():
             await mock_pkg_c.fetch()
             await mock_pkg_d.fetch()
 
-            # Mock the dependency relationships
+            # Mock the dependency relationships and resolve methods
+            async def mock_resolve_a(*, upgrade: bool = False, _force_reinstall: bool = False, _resolved: Optional[Any] = None) -> Set[Any]:
+                return {mock_pkg_a, mock_pkg_b, mock_pkg_c, mock_pkg_d}
+            
+            async def mock_resolve_b(*, upgrade: bool = False, _force_reinstall: bool = False, _resolved: Optional[Any] = None) -> Set[Any]:
+                return {mock_pkg_b, mock_pkg_d}
+            
+            async def mock_resolve_c(*, upgrade: bool = False, _force_reinstall: bool = False, _resolved: Optional[Any] = None) -> Set[Any]:
+                return {mock_pkg_c, mock_pkg_d}
+            
+            async def mock_resolve_d(*, upgrade: bool = False, _force_reinstall: bool = False, _resolved: Optional[Any] = None) -> Set[Any]:
+                return {mock_pkg_d}
+
             with patch.object(mock_pkg_a, "requested_dependencies", return_value={mock_pkg_b, mock_pkg_c}), \
                  patch.object(mock_pkg_b, "requested_dependencies", return_value={mock_pkg_d}), \
                  patch.object(mock_pkg_c, "requested_dependencies", return_value={mock_pkg_d}), \
@@ -355,18 +367,18 @@ def test_complex_dependency_resolution():
                  patch.object(mock_pkg_a, "installed_dependents", return_value=set()), \
                  patch.object(mock_pkg_b, "installed_dependents", return_value=set()), \
                  patch.object(mock_pkg_c, "installed_dependents", return_value=set()), \
-                 patch.object(mock_pkg_d, "installed_dependents", return_value=set()):
+                 patch.object(mock_pkg_d, "installed_dependents", return_value=set()), \
+                 patch.object(mock_pkg_a, "resolve", side_effect=mock_resolve_a), \
+                 patch.object(mock_pkg_b, "resolve", side_effect=mock_resolve_b), \
+                 patch.object(mock_pkg_c, "resolve", side_effect=mock_resolve_c), \
+                 patch.object(mock_pkg_d, "resolve", side_effect=mock_resolve_d):
 
                 # Should not detect cycles in diamond pattern
                 await Package._detect_cycles({mock_pkg_a})
 
                 # Test resolution with mocked dependencies
-                with patch.object(mock_pkg_b, "resolve", return_value={mock_pkg_b, mock_pkg_d}), \
-                     patch.object(mock_pkg_c, "resolve", return_value={mock_pkg_c, mock_pkg_d}), \
-                     patch.object(mock_pkg_d, "resolve", return_value={mock_pkg_d}):
-
-                    resolved = await mock_pkg_a.resolve()
-                    assert mock_pkg_a in resolved
+                resolved = await mock_pkg_a.resolve()
+                assert mock_pkg_a in resolved
 
         asyncio.run(test_diamond_resolution())
         print("✓ Complex dependency resolution test passed")
