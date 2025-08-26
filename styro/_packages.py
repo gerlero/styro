@@ -32,7 +32,7 @@ from ._self import (
 )
 from ._status import Status
 from ._subprocess import run
-from ._util import path_from_uri, reentrantcontextmanager
+from ._util import is_relative_to, path_from_uri, reentrantcontextmanager
 
 
 @reentrantcontextmanager
@@ -589,7 +589,7 @@ class Package:
                     libs = sorted(
                         str(path.relative_to(platform_path() / "lib"))
                         for path in installed_binaries
-                        if path.is_relative_to(platform_path() / "lib")
+                        if is_relative_to(path, platform_path() / "lib")
                     )
                     if libs:
                         installed["packages"][self.name]["libs"] = libs
@@ -597,7 +597,7 @@ class Package:
                     apps = sorted(
                         str(path.relative_to(platform_path() / "bin"))
                         for path in installed_binaries
-                        if path.is_relative_to(platform_path() / "bin")
+                        if is_relative_to(path, platform_path() / "bin")
                     )
                     if apps:
                         installed["packages"][self.name]["apps"] = apps
