@@ -87,6 +87,23 @@ def path_from_uri(uri: str) -> Path:
     return Path(unquote(urlparse(uri).path))
 
 
+def is_relative_to(path: Path, other: Path) -> bool:
+    """
+    Check if a path is relative to another path.
+
+    Compatible implementation for Python < 3.9 where Path.is_relative_to()
+    was not available.
+    """
+    if sys.version_info >= (3, 9):
+        return path.is_relative_to(other)
+    try:
+        path.relative_to(other)
+    except ValueError:
+        return False
+    else:
+        return True
+
+
 @contextmanager
 def get_changed_files(path: Path) -> Generator[Set[Path], None, None]:
     before = {file: file.stat().st_mtime for file in path.rglob("*") if file.is_file()}
