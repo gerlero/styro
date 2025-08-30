@@ -43,7 +43,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         openfoam-version: [9, 13, 2112, 2506]
-        python-version: ['3.7', '3.13']
+        python-version: ['3.8', '3.13']
         include:
           - os: macos-latest
             openfoam-version: 2112

@@ -1,7 +1,6 @@
 import asyncio
 import shlex
 import subprocess
-import sys
 from collections import deque
 from io import StringIO
 from pathlib import Path
@@ -11,8 +10,6 @@ from ._status import Status
 
 
 def _cmd_join(cmd: List[str]) -> str:
-    if sys.version_info < (3, 8):
-        return " ".join(shlex.quote(arg) for arg in cmd)
     return shlex.join(cmd)
 
 
