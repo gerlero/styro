@@ -1,19 +1,12 @@
 import asyncio
 import shlex
 import subprocess
-import sys
 from collections import deque
 from io import StringIO
 from pathlib import Path
 from typing import Deque, Dict, List, Optional
 
 from ._status import Status
-
-
-def _cmd_join(cmd: List[str]) -> str:
-    if sys.version_info < (3, 8):
-        return " ".join(shlex.quote(arg) for arg in cmd)
-    return shlex.join(cmd)
 
 
 async def run(
@@ -28,7 +21,7 @@ async def run(
     )
 
     if status is not None:
-        cmdstr = f"==> \033[1m{_cmd_join(cmd)}\033[0m\n"
+        cmdstr = f"==> \033[1m{shlex.join(cmd)}\033[0m\n"
         lines: Deque[str] = deque(maxlen=4)
 
     output = StringIO()
