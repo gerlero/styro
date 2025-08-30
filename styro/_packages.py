@@ -407,7 +407,7 @@ class Package:
 
         _resolved.add(self)
 
-        if self.installed_sha() is not None and not upgrade and not _force_reinstall:
+        if (sha := self.installed_sha()) is not None and not upgrade and not _force_reinstall:
             return set()
 
         if self._metadata is None:
@@ -417,7 +417,7 @@ class Package:
             self._build_steps()
 
         if (
-            self.installed_sha() is not None
+            (sha := self.installed_sha()) is not None
             and not self._upgrade_available
             and not _force_reinstall
         ):

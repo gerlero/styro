@@ -44,10 +44,7 @@ async def check_for_new_version(
     except Exception:  # noqa: BLE001
         return False
 
-    if latest_version.startswith("v"):
-        latest_version = latest_version[1:]
-
-    if latest_version != __version__:
+    if (latest_version := latest_version[1:] if latest_version.startswith("v") else latest_version) != __version__:
         if verbose:
             typer.echo(
                 f"⚠️ Warning: you are using styro {__version__}, but version {latest_version} is available.",
