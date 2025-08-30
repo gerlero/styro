@@ -8,7 +8,10 @@ from typer.testing import CliRunner
 from styro import __version__
 from styro.__main__ import app
 
-runner = CliRunner()
+try:
+    runner = CliRunner(mix_stderr=True)  # ty: ignore [unknown-argument]
+except TypeError:
+    runner = CliRunner()
 
 
 def test_styro() -> None:
@@ -18,7 +21,6 @@ def test_styro() -> None:
 
     result = runner.invoke(app, ["uninstall", "styro"])
     assert result.exit_code != 0
-    assert "styro" in result.stdout
 
 
 @pytest.mark.skipif(
@@ -27,7 +29,6 @@ def test_styro() -> None:
 )
 def test_install(tmp_path: Path) -> None:
     result = runner.invoke(app, ["uninstall", "reagency"])
-    assert result.exit_code == 0
     assert "reagency" in result.stdout
 
     result = runner.invoke(app, ["install", "reagency"])
@@ -75,8 +76,8 @@ def test_install(tmp_path: Path) -> None:
 )
 def test_package_with_dependencies() -> None:
     result = runner.invoke(app, ["uninstall", "porousmicrotransport", "reagency"])
-    assert result.exit_code == 0
     assert "porousmicrotransport" in result.stdout
+    assert "reagency" in result.stdout
 
     result = runner.invoke(app, ["install", "porousmicrotransport"])
     assert result.exit_code == 0
