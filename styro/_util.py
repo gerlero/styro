@@ -80,14 +80,14 @@ def reentrantcontextmanager(
     return wrapper
 
 
-def path_from_uri(uri: str) -> Path:
+def path_from_uri(uri: str, /) -> Path:
     assert uri.startswith("file://")
     if sys.version_info >= (3, 13):
         return Path.from_uri(uri)
     return Path(unquote(urlparse(uri).path))
 
 
-def is_relative_to(path: Path, other: Path) -> bool:
+def is_relative_to(path: Path, other: Path, /) -> bool:
     """
     Check if a path is relative to another path.
 
@@ -105,7 +105,7 @@ def is_relative_to(path: Path, other: Path) -> bool:
 
 
 @contextmanager
-def get_changed_files(path: Path) -> Generator[Set[Path], None, None]:
+def get_changed_files(path: Path, /) -> Generator[Set[Path], None, None]:
     before = {file: file.stat().st_mtime for file in path.rglob("*") if file.is_file()}
     ret: Set[Path] = set()
     try:
@@ -120,5 +120,5 @@ def get_changed_files(path: Path) -> Generator[Set[Path], None, None]:
 
         # Add modified files (files that existed before but have different timestamps)
         for file in after_files & before_files:
-            if file.stat().st_mtime != before[file]:
+            if (new_mtime := file.stat().st_mtime) != before[file]:
                 ret.add(file)
