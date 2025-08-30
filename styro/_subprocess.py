@@ -9,10 +9,6 @@ from typing import Deque, Dict, List, Optional
 from ._status import Status
 
 
-def _cmd_join(cmd: List[str]) -> str:
-    return shlex.join(cmd)
-
-
 async def run(
     cmd: List[str],
     *,
@@ -25,7 +21,7 @@ async def run(
     )
 
     if status is not None:
-        cmdstr = f"==> \033[1m{_cmd_join(cmd)}\033[0m\n"
+        cmdstr = f"==> \033[1m{shlex.join(cmd)}\033[0m\n"
         lines: Deque[str] = deque(maxlen=4)
 
     output = StringIO()
