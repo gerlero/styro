@@ -120,5 +120,5 @@ def get_changed_files(path: Path, /) -> Generator[Set[Path], None, None]:
 
         # Add modified files (files that existed before but have different timestamps)
         for file in after_files & before_files:
-            if (new_mtime := file.stat().st_mtime) != before[file]:
+            if file.stat().st_mtime != before[file]:
                 ret.add(file)
