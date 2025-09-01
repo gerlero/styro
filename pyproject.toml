@@ -1,10 +1,9 @@
 [build-system]
-requires = ["uv_build>=0.8.14,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "styro"
-version = "0.1.25"
 description = "A community package manager for OpenFOAM"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -35,6 +34,8 @@ dependencies = [
     "typing_extensions>=3.9,<5; python_version < '3.9'",
 ]
 
+dynamic = ["version"]
+
 [dependency-groups]
 dev = [
     "pyinstaller>=5,<7",
@@ -51,8 +52,8 @@ Repository = "https://github.com/gerlero/styro"
 [project.scripts]
 styro = "styro.__main__:app"
 
-[tool.uv.build-backend]
-module-root = "."
+[tool.hatch.version]
+path = "styro/__init__.py"
 
 [tool.mypy]
 packages = ["styro"]
