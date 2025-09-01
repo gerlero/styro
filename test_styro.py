@@ -12,6 +12,7 @@ def test_styro() -> None:
 
     with pytest.raises(SystemExit) as e:
         app(["uninstall", "styro"])
+    assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
 
@@ -58,6 +59,7 @@ def test_package_with_dependencies() -> None:
 
     with pytest.raises(SystemExit) as e:
         app(["uninstall", "reagency"])
+    assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
     app(["uninstall", "reagency", "porousmicrotransport"])

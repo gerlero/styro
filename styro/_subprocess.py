@@ -28,6 +28,7 @@ async def run(
     error = StringIO()
 
     async def process_stdout() -> None:
+        assert proc.stdout is not None
         while line := (await proc.stdout.readline()).decode():
             output.write(line)
             if status is not None:
@@ -35,6 +36,7 @@ async def run(
                 status(cmdstr + "\n".join(lines) + "\n")
 
     async def process_stderr() -> None:
+        assert proc.stderr is not None
         while line := (await proc.stderr.readline()).decode():
             error.write(line)
             if status is not None:
