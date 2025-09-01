@@ -4,8 +4,6 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Set
 
-import typer
-
 if sys.version_info >= (3, 9):
     from collections.abc import Generator
 else:
@@ -18,12 +16,12 @@ def platform_path() -> Path:
     try:
         app_path = Path(os.environ["FOAM_USER_APPBIN"])
         lib_path = Path(os.environ["FOAM_USER_LIBBIN"])
-    except KeyError as e:
-        typer.echo(
+    except KeyError:
+        print(
             "🛑 Error: No OpenFOAM environment found. Please activate (source) the OpenFOAM environment first.",
-            err=True,
+            file=sys.stderr,
         )
-        raise typer.Exit(code=1) from e
+        sys.exit(1)
 
     assert app_path.parent == lib_path.parent
     platform_path = app_path.parent

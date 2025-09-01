@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 import aiohttp
-import typer
 
 from . import __version__
 from ._status import Status
@@ -18,14 +17,14 @@ def is_managed_installation() -> bool:
 
 def print_upgrade_instruction() -> None:
     if is_managed_installation():
-        typer.echo(
+        print(
             "💡 Use your package manager (e.g. pip) to upgrade styro.",
-            err=True,
+            file=sys.stderr,
         )
     else:
-        typer.echo(
+        print(
             "💡 Run 'styro install --upgrade styro' to upgrade styro.",
-            err=True,
+            file=sys.stderr,
         )
 
 
@@ -50,9 +49,9 @@ async def check_for_new_version(
         else latest_version
     ) != __version__:
         if verbose:
-            typer.echo(
+            print(
                 f"⚠️ Warning: you are using styro {__version__}, but version {latest_version} is available.",
-                err=True,
+                file=sys.stderr,
             )
             print_upgrade_instruction()
         return True
@@ -69,14 +68,14 @@ async def selfupgrade() -> None:
                 f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
             ) as response:
                 contents = await response.read()
-        except Exception as e:
-            typer.echo(f"🛑 Error: Failed to download styro: {e}", err=True)
-            raise typer.Exit(code=1) from e
+        except Exception as e:  # noqa: BLE001
+            print(f"🛑 Error: Failed to download styro: {e}", file=sys.stderr)
+            sys.exit(1)
 
     with Status("⏳ Upgrading styro"):
         try:
             with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
                 tar.extract("styro", path=Path(sys.executable).parent)
-        except Exception as e:
-            typer.echo(f"🛑 Error: Failed to upgrade styro: {e}", err=True)
-            raise typer.Exit(code=1) from e
+        except Exception as e:  # noqa: BLE001
+            print(f"🛑 Error: Failed to upgrade styro: {e}", file=sys.stderr)
+            sys.exit(1)

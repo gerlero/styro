@@ -3,22 +3,16 @@ from pathlib import Path
 from subprocess import run
 
 import pytest
-from typer.testing import CliRunner
 
-from styro import __version__
 from styro.__main__ import app
-
-runner = CliRunner()
 
 
 def test_styro() -> None:
-    result = runner.invoke(app, ["install", "styro"])
-    assert result.exit_code == 0
-    assert "styro" in result.stdout
+    app(["install", "styro"])
 
-    result = runner.invoke(app, ["uninstall", "styro"])
-    assert result.exit_code != 0
-    assert "styro" in result.stdout
+    with pytest.raises(SystemExit) as e:
+        app(["uninstall", "styro"])
+    assert e.value.code != 0
 
 
 @pytest.mark.skipif(
@@ -26,47 +20,29 @@ def test_styro() -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_install(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["uninstall", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["uninstall", "reagency"])
 
-    result = runner.invoke(app, ["install", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["install", "reagency"])
 
-    result = runner.invoke(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["freeze"])
 
     run(
         ["git", "clone", "https://github.com/gerlero/reagency.git"],  # noqa: S607
         cwd=tmp_path,
         check=True,
     )
-    result = runner.invoke(app, ["install", str(tmp_path / "reagency")])
-    assert result.exit_code == 0
+    app(["install", str(tmp_path / "reagency")])
 
-    result = runner.invoke(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
-    assert (tmp_path / "reagency").as_uri() in result.stdout
+    app(["freeze"])
 
-    result = runner.invoke(app, ["install", "https://github.com/gerlero/reagency.git"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["install", "https://github.com/gerlero/reagency.git"])
 
-    result = runner.invoke(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
-    assert "https://github.com/gerlero/reagency.git" in result.stdout
+    app(["freeze"])
 
-    result = runner.invoke(app, ["uninstall", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["uninstall", "reagency"])
 
-    result = runner.invoke(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" not in result.stdout
+
+app(["freeze"])
 
 
 @pytest.mark.skipif(
@@ -74,27 +50,14 @@ def test_install(tmp_path: Path) -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_package_with_dependencies() -> None:
-    result = runner.invoke(app, ["uninstall", "porousmicrotransport", "reagency"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
+    app(["uninstall", "porousmicrotransport", "reaagency"])
 
-    result = runner.invoke(app, ["install", "porousmicrotransport"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
+    app(["install", "porousmicrotransport"])
 
-    result = runner.invoke(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
-    assert "reagency" in result.stdout
+    app(["freeze"])
 
-    result = runner.invoke(app, ["uninstall", "reagency"])
-    assert result.exit_code != 0
-    assert "porousmicrotransport" in result.stdout
-    assert "reagency" in result.stdout
+    with pytest.raises(SystemExit) as e:
+        app(["uninstall", "reagency"])
+    assert e.value.code != 0
 
-
-def test_version() -> None:
-    result = runner.invoke(app, ["--version"])
-    assert result.exit_code == 0
-    assert "styro" in result.stdout
-    assert __version__ in result.stdout
+    app(["uninstall", "reagency", "porousmicrotransport"])

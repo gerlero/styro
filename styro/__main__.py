@@ -1,25 +1,25 @@
 """A community package manager for OpenFOAM."""
 
-import sys
 from typing import List
 
-if sys.version_info >= (3, 9):
-    from typing import Annotated
-else:
-    from typing_extensions import Annotated
-
-import typer
+import cyclopts
 
 from . import __version__
 from ._packages import Package
 from ._self import check_for_new_version
 from ._util import async_to_sync
 
-app = typer.Typer(help=__doc__, add_completion=False)
 
-
-@app.command()
 @async_to_sync
+async def _version_callback() -> str:
+    await check_for_new_version(verbose=True)
+    return f"styro {__version__}"
+
+
+app = cyclopts.App(help=__doc__, version=_version_callback)
+
+
+@app.command
 async def install(packages: List[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
     pkgs = {Package(pkg) for pkg in packages}
@@ -30,8 +30,7 @@ async def install(packages: List[str], *, upgrade: bool = False) -> None:
     await Package.install_all(pkgs, upgrade=upgrade)
 
 
-@app.command()
-@async_to_sync
+@app.command
 async def uninstall(packages: List[str]) -> None:
     """Uninstall OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
@@ -39,33 +38,11 @@ async def uninstall(packages: List[str]) -> None:
     await Package.uninstall_all(pkgs)
 
 
-@app.command()
-@async_to_sync
+@app.command
 async def freeze() -> None:
     """List installed OpenFOAM packages."""
     for pkg in Package.all_installed():
-        typer.echo(pkg)
-
-
-@async_to_sync
-async def _version_callback(*, show: bool) -> None:
-    if show:
-        await check_for_new_version(verbose=True)
-        typer.echo(f"styro {__version__}")
-        raise typer.Exit
-
-
-@app.callback()
-def common(
-    *,
-    version: Annotated[
-        bool,
-        typer.Option(
-            "--version", help="Show version and exit.", callback=_version_callback
-        ),
-    ] = False,
-) -> None:
-    pass
+        print(pkg)
 
 
 if __name__ == "__main__":
