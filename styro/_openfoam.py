@@ -16,7 +16,7 @@ def platform_path() -> Path:
     try:
         app_path = Path(os.environ["FOAM_USER_APPBIN"])
         lib_path = Path(os.environ["FOAM_USER_LIBBIN"])
-    except KeyError as e:
+    except KeyError:
         print(
             "🛑 Error: No OpenFOAM environment found. Please activate (source) the OpenFOAM environment first.",
             file=sys.stderr,

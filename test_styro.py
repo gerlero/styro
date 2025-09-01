@@ -1,9 +1,8 @@
 import os
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 from subprocess import run
-from io import StringIO
-import sys
-from contextlib import redirect_stdout, redirect_stderr
 
 import pytest
 
@@ -12,19 +11,19 @@ from styro.__main__ import app
 
 
 class CycloptsTestResult:
-    """Simple test result class to mimic typer.testing.Result"""
-    def __init__(self, exit_code: int, stdout: str, stderr: str):
+    """Simple test result class similar to CLI testing frameworks"""
+    def __init__(self, exit_code: int, stdout: str, stderr: str) -> None:
         self.exit_code = exit_code
-        self.stdout = stdout 
+        self.stdout = stdout
         self.stderr = stderr
 
 
-def invoke_app(app_instance, args):
+def invoke_app(app_instance, args) -> CycloptsTestResult:
     """Simple test runner for cyclopts apps"""
     stdout_capture = StringIO()
     stderr_capture = StringIO()
     exit_code = 0
-    
+
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             app_instance(args)
@@ -32,7 +31,7 @@ def invoke_app(app_instance, args):
         exit_code = e.code if e.code is not None else 0
     except Exception:
         exit_code = 1
-        
+
     return CycloptsTestResult(
         exit_code=exit_code,
         stdout=stdout_capture.getvalue(),
