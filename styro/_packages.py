@@ -20,7 +20,6 @@ else:
     from typing import Generator
 
 import aiohttp
-import typer
 
 from ._git import clone, fetch
 from ._openfoam import get_changed_binaries, openfoam_version, platform_path
@@ -52,12 +51,12 @@ def _lock() -> Generator[Dict[str, Any], None, None]:
         else:
             assert isinstance(installed, dict)
             if installed.get("version") != 1:
-                typer.echo(
+                print(
                     "🛑 Error: installed.json file is of a newer version. Please upgrade styro.",
-                    err=True,
+                    file=sys.stderr,
                 )
                 print_upgrade_instruction()
-                raise typer.Exit(code=1)
+                sys.exit(1)
         installed_copy = deepcopy(installed)
         try:
             yield installed
@@ -86,11 +85,11 @@ class Package:
             pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
         }
         if duplicate_names:
-            typer.echo(
+            print(
                 f"🛑 Error: duplicate/conflicting package names: {', '.join(duplicate_names)}",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
     @staticmethod
     def all_installed_binaries() -> Set[Path]:
@@ -120,11 +119,11 @@ class Package:
             origin = origin.lstrip()
             if Package.__name_regex.match(name):
                 return name, origin
-            typer.echo(
+            print(
                 f"🛑 Error: Invalid package name: {name}",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
         return None, package
 
     @staticmethod
@@ -142,7 +141,7 @@ class Package:
         - visiting (gray): package currently being processed
         - visited (black): package and all its dependencies processed
 
-        Raises typer.Exit if a cycle is detected.
+        Raises SystemExit if a cycle is detected.
         """
 
         class State(Enum):
@@ -168,12 +167,11 @@ class Package:
                 cycle = [*path[cycle_start_idx:], pkg]
                 cycle_names = " -> ".join(p.name for p in cycle)
 
-                typer.secho(
+                print(
                     f"❌ Dependency cycle detected: {cycle_names}",
-                    fg=typer.colors.RED,
-                    err=True,
+                    file=sys.stderr,
                 )
-                raise typer.Exit(code=1)
+                sys.exit(1)
 
             states[pkg] = State.VISITING
             path.append(pkg)
@@ -273,11 +271,11 @@ class Package:
             dependents.update(pkg.installed_dependents())
         dependents -= pkgs
         if dependents:
-            typer.echo(
+            print(
                 f"🛑 Error: Cannot uninstall {','.join([pkg.name for pkg in pkgs])}: required by {','.join([dep.name for dep in dependents])}",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
         await asyncio.gather(
             *(pkg.uninstall(_force=True) for pkg in pkgs),
@@ -304,17 +302,17 @@ class Package:
 
     def __init__(self, name: str) -> None:
         if not Package.__name_regex.match(name):
-            typer.echo(
+            print(
                 f"🛑 Error: Invalid package name: {name}",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
         if name == "styro" and not isinstance(self, _Styro):
-            typer.echo(
+            print(
                 "🛑 Error: 'styro' not allowed as a package name.",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
         self.name = name
         self.origin: Optional[Union[str, Path]] = None
         self._metadata: Optional[Dict[str, Any]] = None
@@ -328,11 +326,11 @@ class Package:
         if build == "wmake":
             build = ["wmake all -j"]
         elif isinstance(build, str):
-            typer.echo(
+            print(
                 f"🛑 Error: Unsupported build system: {build}.",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
         return build
 
@@ -362,33 +360,33 @@ class Package:
                     version = int(spec[1:])
                     compatible = openfoam_version() < version
                 else:
-                    typer.echo(
+                    print(
                         f"⚠️ Warning: {self.name}: ignoring invalid version specifier '{spec}'.",
-                        err=True,
+                        file=sys.stderr,
                     )
                     continue
             except ValueError:
-                typer.echo(
+                print(
                     f"⚠️ Warning: {self.name}: ignoring invalid version specifier '{spec}'.",
-                    err=True,
+                    file=sys.stderr,
                 )
                 continue
 
             if (openfoam_version() < 1000) == (version < 1000):  # noqa: PLR2004
                 distro_compatible = True
                 if not compatible:
-                    typer.echo(
+                    print(
                         f"🛑 Error: OpenFOAM version is {openfoam_version()}, but {self.name} requires {spec}.",
-                        err=True,
+                        file=sys.stderr,
                     )
-                    raise typer.Exit(code=1)
+                    sys.exit(1)
 
         if specs and not distro_compatible:
-            typer.echo(
+            print(
                 f"🛑 Error: {self.name} is not compatible with this OpenFOAM distribution (requires {', '.join(specs)}).",
-                err=True,
+                file=sys.stderr,
             )
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
     async def fetch(self) -> None:
         raise NotImplementedError
@@ -506,7 +504,7 @@ class Package:
                 and not upgrade
                 and not _force_reinstall
             ):
-                typer.echo(
+                print(
                     f"✋ Package '{self.name}' is already installed.",
                 )
                 return
@@ -522,7 +520,7 @@ class Package:
                 and not self._upgrade_available
                 and not _force_reinstall
             ):
-                typer.echo(
+                print(
                     f"✋ Package '{self.name}' is already up-to-date.",
                 )
                 return
@@ -562,18 +560,18 @@ class Package:
                                     status=status,
                                 )
                     except subprocess.CalledProcessError as e:
-                        typer.echo(
+                        print(
                             f"🛑 Error: failed to build package '{self.name}'\n{e.stderr}",
-                            err=True,
+                            file=sys.stderr,
                         )
-                        raise typer.Exit(code=1) from e
+                        sys.exit(1)
                     finally:
                         all_installed_binaries = self.all_installed_binaries()
                         for path in list(installed_binaries):
                             if path in all_installed_binaries:
-                                typer.echo(
+                                print(
                                     f"⚠️ Warning: {self.name} modified {path}, which was installed by another package!",
-                                    err=True,
+                                    file=sys.stderr,
                                 )
                                 installed_binaries.remove(path)
 
@@ -621,17 +619,17 @@ class Package:
 
                 self._upgrade_available = False
 
-                typer.echo(f"✅ Package '{self.name}' installed successfully.")
+                print(f"✅ Package '{self.name}' installed successfully.")
 
                 if libs:
-                    typer.echo("⚙️ New libraries:")
+                    print("⚙️ New libraries:")
                     for lib in libs:
-                        typer.echo(f"  {lib}")
+                        print(f"  {lib}")
 
                 if apps:
-                    typer.echo("🖥️ New applications:")
+                    print("🖥️ New applications:")
                     for app in apps:
-                        typer.echo(f"  {app}")
+                        print(f"  {app}")
 
             if isinstance(_deps, dict):
                 _deps[self].set()
@@ -648,9 +646,9 @@ class Package:
 
         with lock as installed:
             if not self.is_installed():
-                typer.echo(
+                print(
                     f"⚠️ Warning: skipping package '{self.name}' as it is not installed.",
-                    err=True,
+                    file=sys.stderr,
                 )
                 return
 
@@ -670,7 +668,7 @@ class Package:
 
         assert not self.is_installed()
 
-        typer.echo(f"🗑️ Package '{self.name}' uninstalled successfully.")
+        print(f"🗑️ Package '{self.name}' uninstalled successfully.")
 
     def __str__(self) -> str:
         return self.name
@@ -695,11 +693,11 @@ class _IndexedPackage(Package):
                 ) as response:
                     self._metadata = await response.json(content_type="text/plain")
             except Exception as e:
-                typer.echo(
+                print(
                     f"🛑 Error: Failed to fetch package '{self.name}': {e}",
-                    err=True,
+                    file=sys.stderr,
                 )
-                raise typer.Exit(code=1) from e
+                sys.exit(1)
 
         assert self._metadata is not None
 
@@ -831,12 +829,12 @@ class _Styro(Package):
             return set()
 
         if is_managed_installation():
-            typer.echo(
+            print(
                 "🛑 Error: this is a managed installation of styro.",
-                err=True,
+                file=sys.stderr,
             )
             print_upgrade_instruction()
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
         return {self}
 
@@ -848,44 +846,44 @@ class _Styro(Package):
         _deps: Union[bool, Dict[Package, asyncio.Event]] = True,
     ) -> None:
         if not upgrade and not _force_reinstall:
-            typer.echo(
+            print(
                 "✋ Package 'styro' is already installed.",
             )
             return
 
         if is_managed_installation():
-            typer.echo(
+            print(
                 "🛑 Error: this is a managed installation of styro.",
-                err=True,
+                file=sys.stderr,
             )
             print_upgrade_instruction()
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
         self._upgrade_available = await check_for_new_version(verbose=False)
 
         if not _force_reinstall and not self._upgrade_available:
-            typer.echo(
+            print(
                 "✋ Package 'styro' is already up-to-date.",
             )
             return
 
         await selfupgrade()
 
-        typer.echo("✅ Package 'styro' upgraded successfully.")
+        print("✅ Package 'styro' upgraded successfully.")
 
     async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
-        typer.echo(
+        print(
             "🛑 Error: styro cannot be uninstalled this way.",
-            err=True,
+            file=sys.stderr,
         )
         if is_managed_installation():
-            typer.echo(
+            print(
                 "💡 Use your package manager (e.g. pip) to uninstall styro.",
-                err=True,
+                file=sys.stderr,
             )
         else:
-            typer.echo(
+            print(
                 "💡 Delete the 'styro' binary in $FOAM_USER_APPBIN to uninstall.",
-                err=True,
+                file=sys.stderr,
             )
-        raise typer.Exit(code=1)
+        sys.exit(1)
