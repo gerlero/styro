@@ -68,7 +68,7 @@ async def selfupgrade() -> None:
                 f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
             ) as response:
                 contents = await response.read()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"🛑 Error: Failed to download styro: {e}", file=sys.stderr)
             sys.exit(1)
 
@@ -76,6 +76,6 @@ async def selfupgrade() -> None:
         try:
             with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
                 tar.extract("styro", path=Path(sys.executable).parent)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"🛑 Error: Failed to upgrade styro: {e}", file=sys.stderr)
             sys.exit(1)

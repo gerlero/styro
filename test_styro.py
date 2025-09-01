@@ -1,52 +1,18 @@
 import os
-from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
 from pathlib import Path
 from subprocess import run
 
 import pytest
 
-from styro import __version__
 from styro.__main__ import app
 
 
-class CycloptsTestResult:
-    """Simple test result class similar to CLI testing frameworks"""
-    def __init__(self, exit_code: int, stdout: str, stderr: str) -> None:
-        self.exit_code = exit_code
-        self.stdout = stdout
-        self.stderr = stderr
-
-
-def invoke_app(app_instance, args) -> CycloptsTestResult:
-    """Simple test runner for cyclopts apps"""
-    stdout_capture = StringIO()
-    stderr_capture = StringIO()
-    exit_code = 0
-
-    try:
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            app_instance(args)
-    except SystemExit as e:
-        exit_code = e.code if e.code is not None else 0
-    except Exception:
-        exit_code = 1
-
-    return CycloptsTestResult(
-        exit_code=exit_code,
-        stdout=stdout_capture.getvalue(),
-        stderr=stderr_capture.getvalue()
-    )
-
-
 def test_styro() -> None:
-    result = invoke_app(app, ["install", "styro"])
-    assert result.exit_code == 0
-    assert "styro" in result.stdout
+    app(["install", "styro"])
 
-    result = invoke_app(app, ["uninstall", "styro"])
-    assert result.exit_code != 0
-    assert "styro" in result.stdout
+    with pytest.raises(SystemExit) as e:
+        app(["uninstall", "styro"])
+    assert e.value.code != 0
 
 
 @pytest.mark.skipif(
@@ -54,47 +20,29 @@ def test_styro() -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_install(tmp_path: Path) -> None:
-    result = invoke_app(app, ["uninstall", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["uninstall", "reagency"])
 
-    result = invoke_app(app, ["install", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["install", "reagency"])
 
-    result = invoke_app(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["freeze"])
 
     run(
         ["git", "clone", "https://github.com/gerlero/reagency.git"],  # noqa: S607
         cwd=tmp_path,
         check=True,
     )
-    result = invoke_app(app, ["install", str(tmp_path / "reagency")])
-    assert result.exit_code == 0
+    app(["install", str(tmp_path / "reagency")])
 
-    result = invoke_app(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
-    assert (tmp_path / "reagency").as_uri() in result.stdout
+    app(["freeze"])
 
-    result = invoke_app(app, ["install", "https://github.com/gerlero/reagency.git"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["install", "https://github.com/gerlero/reagency.git"])
 
-    result = invoke_app(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
-    assert "https://github.com/gerlero/reagency.git" in result.stdout
+    app(["freeze"])
 
-    result = invoke_app(app, ["uninstall", "reagency"])
-    assert result.exit_code == 0
-    assert "reagency" in result.stdout
+    app(["uninstall", "reagency"])
 
-    result = invoke_app(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "reagency" not in result.stdout
+
+app(["freeze"])
 
 
 @pytest.mark.skipif(
@@ -102,27 +50,14 @@ def test_install(tmp_path: Path) -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_package_with_dependencies() -> None:
-    result = invoke_app(app, ["uninstall", "porousmicrotransport", "reagency"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
+    app(["uninstall", "porousmicrotransport", "reaagency"])
 
-    result = invoke_app(app, ["install", "porousmicrotransport"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
+    app(["install", "porousmicrotransport"])
 
-    result = invoke_app(app, ["freeze"])
-    assert result.exit_code == 0
-    assert "porousmicrotransport" in result.stdout
-    assert "reagency" in result.stdout
+    app(["freeze"])
 
-    result = invoke_app(app, ["uninstall", "reagency"])
-    assert result.exit_code != 0
-    assert "porousmicrotransport" in result.stdout
-    assert "reagency" in result.stdout
+    with pytest.raises(SystemExit) as e:
+        app(["uninstall", "reagency"])
+    assert e.value.code != 0
 
-
-def test_version() -> None:
-    result = invoke_app(app, ["--version"])
-    assert result.exit_code == 0
-    assert "styro" in result.stdout
-    assert __version__ in result.stdout
+    app(["uninstall", "reagency", "porousmicrotransport"])

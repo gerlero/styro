@@ -1,12 +1,6 @@
 """A community package manager for OpenFOAM."""
 
-import sys
 from typing import List
-
-if sys.version_info >= (3, 9):
-    pass
-else:
-    pass
 
 import cyclopts
 
@@ -26,7 +20,6 @@ app = cyclopts.App(help=__doc__, version=_version_callback)
 
 
 @app.command
-@async_to_sync
 async def install(packages: List[str], *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
     pkgs = {Package(pkg) for pkg in packages}
@@ -38,7 +31,6 @@ async def install(packages: List[str], *, upgrade: bool = False) -> None:
 
 
 @app.command
-@async_to_sync
 async def uninstall(packages: List[str]) -> None:
     """Uninstall OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
@@ -47,7 +39,6 @@ async def uninstall(packages: List[str]) -> None:
 
 
 @app.command
-@async_to_sync
 async def freeze() -> None:
     """List installed OpenFOAM packages."""
     for pkg in Package.all_installed():

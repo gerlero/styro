@@ -692,7 +692,7 @@ class _IndexedPackage(Package):
                     f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
                 ) as response:
                     self._metadata = await response.json(content_type="text/plain")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(
                     f"🛑 Error: Failed to fetch package '{self.name}': {e}",
                     file=sys.stderr,
