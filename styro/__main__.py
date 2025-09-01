@@ -16,7 +16,7 @@ async def _version_callback() -> str:
     return f"styro {__version__}"
 
 
-app = cyclopts.App(help=__doc__, version=_version_callback)
+app = cyclopts.App(help=__doc__, version=_version_callback)  # ty: ignore[unknown-argument]
 
 
 @app.command
