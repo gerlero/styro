@@ -1,11 +1,9 @@
 <div align="center">
   <img src="https://github.com/gerlero/styro/raw/main/logo.png" alt="styro" width="200"/>
   
-  # styro
-  
-  **🌊 A modern, community-driven package manager for OpenFOAM**
-  
-  *Simplify your OpenFOAM workflow with easy package installation, management, and distribution*
+  **🌊 A community-driven package manager for OpenFOAM**
+
+  Simplify your OpenFOAM workflows with easy package installation, management, and distribution
 </div>
 
 <div align="center">
@@ -28,34 +26,15 @@
 
 ## ✨ Why styro?
 
-**styro** brings modern package management to the OpenFOAM ecosystem, making it easy to discover, install, and manage community-contributed packages. Whether you're a researcher, engineer, or developer, styro streamlines your workflow by eliminating manual compilation and dependency management.
+**styro** brings modern package management to the OpenFOAM ecosystem, making it easy to discover, install, and manage community-contributed packages. Whether you're a researcher, engineer, and/or developer, **styro** streamlines your workflow by eliminating manual compilation and dependency management.
 
-### 🎯 Key Benefits
+### 🎯 Key benefits
 
-- **🚀 One-command installation** - Install complex OpenFOAM packages with a single command
-- **🌍 Community-driven** - Access packages from the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi)
+- **🚀 One-command installation** - Install OpenFOAM packages with a single command
+- **🌎 Community-driven** - Access packages from the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi)
 - **🔄 Version management** - Easy upgrades and dependency resolution
 - **📦 Multiple sources** - Install from OPI, local directories, or Git repositories
-- **🛠️ Developer-friendly** - Simple package creation and distribution
-
-## 🚀 Quick Start
-
-```bash
-# Install styro
-pip install styro
-
-# Install a package from the OpenFOAM Package Index
-styro install OpenQBMM
-
-# Install from a Git repository
-styro install https://github.com/gerlero/reagency.git
-
-# List installed packages
-styro freeze
-
-# Upgrade a package
-styro install --upgrade OpenQBMM
-```
+- **🛠️ Developer-friendly** - Simple package testing, definition and distribution
 
 ## ▶️ Demo
 
@@ -66,83 +45,58 @@ styro install --upgrade OpenQBMM
 Before using **styro**, ensure you have:
 
 - **OpenFOAM** (from [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org))
-- **Git** (for repository-based installations)
-- **Python 3.8+** (if installing via pip or conda)
+- **Git**
 
 ## ⏬ Installation
 
-### 🐍 Python Package Managers
+Choose any of the following methods:
 
-<details>
-<summary><strong>pip</strong> (recommended)</summary>
+* With [pip](https://pypi.org/project/pip/) (requires Python 3.8 or later):
 
-```bash
-pip install styro
-```
-*Requires Python 3.8 or later*
-</details>
+    ```bash
+    pip install styro
+    ```
 
-<details>
-<summary><strong>conda</strong></summary>
+* With [conda](https://docs.conda.io/en/latest/):
 
-```bash
-conda install -c conda-forge styro
-```
-</details>
+    ```bash
+    conda install -c conda-forge styro
+    ```
 
-### 🍺 System Package Managers
+* With [Homebrew](https://brew.sh/):
 
-<details>
-<summary><strong>Homebrew (macOS/Linux)</strong></summary>
+    ```bash
+    brew install gerlero/openfoam/styro
+    ```
 
-```bash
-brew install gerlero/openfoam/styro
-```
-</details>
+* Standalone binary (installs to `$FOAM_USER_APPBIN`):
 
-### 📦 Standalone Binary
-
-Perfect for use in containers or when you don't want Python dependencies:
-
-```bash
-/bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
-```
-
-*Installs to `$FOAM_USER_APPBIN`*
+    ```bash
+    /bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
+    ```
 
 
-## 🧑‍💻 Command Reference
+
+## 🧑‍💻 Command reference
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `styro install <packages>` | Install one or more packages | `styro install OpenQBMM swak4Foam` |
-| `styro install --upgrade <packages>` | Upgrade already installed packages | `styro install --upgrade OpenQBMM` |
-| `styro uninstall <packages>` | Remove installed packages | `styro uninstall OpenQBMM` |
-| `styro freeze` | List all installed packages | `styro freeze` |
+| ⏬ `styro install <packages>` | Install one or more packages | `styro install cfmesh` |
+| ⬆️ `styro install --upgrade <packages>` | Upgrade already installed packages | `styro install --upgrade cfmesh` |
+| 🗑️ `styro uninstall <packages>` | Remove installed packages | `styro uninstall cfmesh` |
+| 🔍 `styro freeze` | List all installed packages | `styro freeze` |
+| 🔄 `styro install --upgrade styro` | Upgrade **styro** itself (only for standalone installs) | `styro install --upgrade styro` |
 
 
-## 📦 Package Sources
+## 📦 Package sources
 
 ### ✨ OpenFOAM Package Index (OPI)
 
 **styro** automatically discovers packages from the community-maintained [OpenFOAM Package Index](https://github.com/exasim-project/opi).
 
-**Popular packages include:**
-- `OpenQBMM` - Quadrature-based moment methods
-- `swak4Foam` - Swiss Army Knife for OpenFOAM
-- `cfMesh` - Library for mesh generation
-- `DAFoam` - Discrete adjoint solver
-
-<details>
-<summary>View all available packages</summary>
-
-Browse the complete catalog at: https://github.com/exasim-project/opi/tree/main/pkg
-
 ```bash
-# Install any indexed package by name
-styro install <package-name>
+styro install cfmesh
 ```
-</details>
 
 ### 🖥️ Local Packages
 
@@ -152,56 +106,18 @@ Install packages from your local filesystem:
 styro install /path/to/my-custom-package
 ```
 
-**Pro tip:** Add a [`metadata.json`](https://github.com/exasim-project/opi/blob/main/metadata.json) file to customize installation behavior.
+**Pro tip:** Add a [`metadata.json`](https://github.com/exasim-project/opi/blob/main/metadata.json) file to the package directory to customize installation behavior.
 
 ### 🌎 Git Repositories
 
 Install directly from any Git repository:
 
 ```bash
-# From GitHub
 styro install https://github.com/username/my-openfoam-package.git
-
-# From GitLab
-styro install https://gitlab.com/username/my-package.git
-
-# With specific branch/tag
-styro install https://github.com/username/package.git@v1.2.3
 ```
 
 Just like local packages, add a `metadata.json` file to the repository root for custom installation settings.
 
----
-
-## 🛠️ Troubleshooting
-
-<details>
-<summary><strong>Common Issues</strong></summary>
-
-**Package not found**
-```bash
-# Make sure OpenFOAM environment is loaded
-source /path/to/openfoam/etc/bashrc
-
-# Check package name spelling
-styro freeze  # lists installed packages
-```
-
-**Installation fails**
-- Ensure you have write permissions to the OpenFOAM installation directory
-- Check that Git is installed and accessible
-- Verify OpenFOAM environment variables are set correctly
-
-**Python/pip issues**
-```bash
-# Try installing in user mode
-pip install --user styro
-
-# Or use conda instead
-conda install -c conda-forge styro
-```
-
-</details>
 
 ## 🤝 Contributing
 
@@ -210,19 +126,3 @@ We welcome contributions! Here's how you can help:
 - **📦 Add packages** to the [OpenFOAM Package Index](https://github.com/exasim-project/opi)
 - **🐛 Report bugs** or request features via [GitHub Issues](https://github.com/gerlero/styro/issues)
 - **🔧 Submit pull requests** to improve styro itself
-- **📝 Improve documentation** and help others in discussions
-
-## 📚 Learn More
-
-- **📖 Documentation:** [OpenFOAM Package Index](https://github.com/exasim-project/opi)
-- **💬 Discussions:** [GitHub Discussions](https://github.com/gerlero/styro/discussions)
-- **🐛 Issues:** [Bug Reports & Feature Requests](https://github.com/gerlero/styro/issues)
-- **📧 Contact:** ggerlero@cimec.unl.edu.ar
-
----
-
-<div align="center">
-  <strong>Made with ❤️ for the OpenFOAM community</strong>
-  <br>
-  <em>Star ⭐ this repository if styro helps your workflow!</em>
-</div>
