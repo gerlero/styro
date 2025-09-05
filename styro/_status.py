@@ -18,8 +18,26 @@ class _Stream:
         self._stream.flush()
 
 
+class _StderrMonitor:
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def write(self, data: str) -> None:
+        # Mark that stderr has been written to, disabling Status clearing
+        Status._stderr_written = True
+        self._stream.write(data)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
 _stdout = sys.stdout
+_stderr = sys.stderr
 sys.stdout = _Stream(sys.stdout)
+sys.stderr = _StderrMonitor(sys.stderr)
 
 
 class Status:
@@ -27,11 +45,13 @@ class Status:
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
     _animation_task: ClassVar[Optional[asyncio.Task]] = None
+    _stderr_written: ClassVar[bool] = False
 
     @staticmethod
     def clear() -> None:
         sys.stdout.flush()
-        if Status._printed_lines > 0:
+        # Don't clear if stderr has been written to, as it would clear stderr content
+        if Status._printed_lines > 0 and not Status._stderr_written:
             _stdout.write(f"\033[{Status._printed_lines}A\033[J")
         Status._printed_lines = 0
 
@@ -40,6 +60,10 @@ class Status:
         Status.clear()
         for status in Status._statuses:
             text = str(status)
+            # If stderr has been written to, ensure we start on a new line
+            if Status._stderr_written and Status._printed_lines == 0:
+                _stdout.write("\n")
+                Status._printed_lines += 1
             _stdout.write(text)
             Status._printed_lines += text.count("\n")
 
