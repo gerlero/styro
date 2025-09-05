@@ -32,7 +32,7 @@
 
 - **🚀 One-command installation** - Install OpenFOAM packages with a single command
 - **🌎 Community-driven** - Access packages from the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi)
-- **🔄 Version management** - Easy upgrades and dependency resolution
+- **🔄 Keep up to date** - Easy upgrades and dependency resolution
 - **📦 Multiple sources** - Install from OPI, local directories, or Git repositories
 - **🛠️ Developer-friendly** - Simple package testing, definition and distribution
 
