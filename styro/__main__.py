@@ -1,5 +1,7 @@
 """Package manager for OpenFOAM."""
 
+from __future__ import annotations
+
 import cyclopts
 
 from . import __version__

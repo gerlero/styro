@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import sys
-from collections.abc import Callable, Coroutine, Generator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
-from types import TracebackType
-from typing import Any, Generic, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from urllib.parse import unquote, urlparse
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Generator
+    from types import TracebackType
 
 R = TypeVar("R")
 S = TypeVar("S")
@@ -28,8 +32,8 @@ class _ReentrantContextManager(Generic[R]):
     def __init__(self, func: Callable[[], Generator[R, None, None]]) -> None:
         self._func = func
         self._lock_depth = 0
-        self._gen: Optional[Generator[R, None, None]] = None
-        self._value: Optional[R] = None
+        self._gen: Generator[R, None, None] | None = None
+        self._value: R | None = None
 
     def __enter__(self) -> R:
         if self._lock_depth == 0:
@@ -40,9 +44,9 @@ class _ReentrantContextManager(Generic[R]):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         self._lock_depth -= 1
         if self._lock_depth == 0:

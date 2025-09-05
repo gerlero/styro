@@ -1,9 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 import sys
 import time
 from io import TextIOBase
-from types import TracebackType
-from typing import ClassVar, Optional, TextIO
+from typing import TYPE_CHECKING, ClassVar, TextIO
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
 class _StreamWrapper(TextIOBase):
@@ -27,10 +36,10 @@ sys.stderr = _StreamWrapper(sys.stderr)
 
 
 class Status:
-    _statuses: ClassVar[list["Status"]] = []
+    _statuses: ClassVar[list[Status]] = []
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
-    _animation_task: ClassVar[Optional[asyncio.Task]] = None
+    _animation_task: ClassVar[asyncio.Task | None] = None
 
     @staticmethod
     def clear() -> None:
@@ -71,7 +80,7 @@ class Status:
         self.msg = msg
         Status.display()
 
-    def __enter__(self) -> "Status":
+    def __enter__(self) -> Self:
         Status._statuses.append(self)
         if len(Status._statuses) == 1:
             Status._animation_task = asyncio.create_task(Status._animate())
@@ -80,9 +89,9 @@ class Status:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         Status._statuses.remove(self)
         if not Status._statuses:
