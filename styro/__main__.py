@@ -1,4 +1,4 @@
-"""A community package manager for OpenFOAM."""
+"""Package manager for OpenFOAM."""
 
 from typing import List
 
