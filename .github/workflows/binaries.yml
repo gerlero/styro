@@ -13,6 +13,8 @@ on:
 
 jobs:
   binary:
+    permissions:
+      contents: write
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
