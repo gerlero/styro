@@ -20,7 +20,6 @@ class _Stream:
 
 _stdout = sys.stdout
 sys.stdout = _Stream(sys.stdout)
-sys.stderr = _Stream(sys.stderr)
 
 
 class Status:
