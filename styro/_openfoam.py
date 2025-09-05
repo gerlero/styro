@@ -1,13 +1,8 @@
 import os
 import sys
+from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from typing import Set
-
-if sys.version_info >= (3, 9):
-    from collections.abc import Generator
-else:
-    from typing import Generator
 
 from ._util import get_changed_files
 
@@ -43,8 +38,8 @@ def openfoam_version() -> int:
 
 
 @contextmanager
-def get_changed_binaries() -> Generator[Set[Path], None, None]:
-    ret: Set[Path] = set()
+def get_changed_binaries() -> Generator[set[Path], None, None]:
+    ret: set[Path] = set()
     changed_binaries = None
     changed_libraries = None
 

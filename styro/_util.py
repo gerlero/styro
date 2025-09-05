@@ -1,16 +1,12 @@
 import asyncio
 import sys
+from collections.abc import Callable, Coroutine, Generator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Generic, Optional, Set, Type, TypeVar, cast
+from typing import Any, Generic, Optional, TypeVar, cast
 from urllib.parse import unquote, urlparse
-
-if sys.version_info >= (3, 9):
-    from collections.abc import Callable, Coroutine, Generator
-else:
-    from typing import Callable, Coroutine, Generator
 
 R = TypeVar("R")
 S = TypeVar("S")
@@ -44,7 +40,7 @@ class _ReentrantContextManager(Generic[R]):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:
@@ -87,27 +83,10 @@ def path_from_uri(uri: str, /) -> Path:
     return Path(unquote(urlparse(uri).path))
 
 
-def is_relative_to(path: Path, other: Path, /) -> bool:
-    """
-    Check if a path is relative to another path.
-
-    Compatible implementation for Python < 3.9 where Path.is_relative_to()
-    was not available.
-    """
-    if sys.version_info >= (3, 9):
-        return path.is_relative_to(other)
-    try:
-        path.relative_to(other)
-    except ValueError:
-        return False
-    else:
-        return True
-
-
 @contextmanager
-def get_changed_files(path: Path, /) -> Generator[Set[Path], None, None]:
+def get_changed_files(path: Path, /) -> Generator[set[Path], None, None]:
     before = {file: file.stat().st_mtime for file in path.rglob("*") if file.is_file()}
-    ret: Set[Path] = set()
+    ret: set[Path] = set()
     try:
         yield ret
     finally:

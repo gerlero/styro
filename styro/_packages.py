@@ -9,15 +9,11 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
-
-if sys.version_info >= (3, 9):
-    from collections.abc import Generator
-else:
-    from typing import Generator
+from typing import Any, ClassVar, Optional, Union
 
 import aiohttp
 
@@ -31,11 +27,11 @@ from ._self import (
 )
 from ._status import Status
 from ._subprocess import run
-from ._util import is_relative_to, path_from_uri, reentrantcontextmanager
+from ._util import path_from_uri, reentrantcontextmanager
 
 
 @reentrantcontextmanager
-def _lock() -> Generator[Dict[str, Any], None, None]:
+def _lock() -> Generator[dict[str, Any], None, None]:
     installed_path = platform_path() / "styro" / "installed.json"
 
     installed_path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,7 +76,7 @@ class Package:
     )
 
     @staticmethod
-    def _check_for_duplicate_names(pkgs: Set["Package"]) -> None:
+    def _check_for_duplicate_names(pkgs: set["Package"]) -> None:
         duplicate_names = {
             pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
         }
@@ -92,7 +88,7 @@ class Package:
             sys.exit(1)
 
     @staticmethod
-    def all_installed_binaries() -> Set[Path]:
+    def all_installed_binaries() -> set[Path]:
         with lock as installed:
             return {
                 Path(platform_path() / "bin" / app)
@@ -109,7 +105,7 @@ class Package:
     @staticmethod
     def parse_package(
         package: str,
-    ) -> Union[Tuple[str, None], Tuple[None, str], Tuple[str, str]]:
+    ) -> Union[tuple[str, None], tuple[None, str], tuple[str, str]]:
         name = package.lower().replace("_", "-")
         if Package.__name_regex.match(name):
             return name, None
@@ -127,12 +123,12 @@ class Package:
         return None, package
 
     @staticmethod
-    def all_installed() -> Set["Package"]:
+    def all_installed() -> set["Package"]:
         with lock as installed:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
-    async def _detect_cycles(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
+    async def _detect_cycles(pkgs: set["Package"], *, upgrade: bool = False) -> None:
         """
         Detect cycles in the dependency graph before installation.
 
@@ -149,8 +145,8 @@ class Package:
             VISITING = 1
             VISITED = 2
 
-        states: Dict[Package, State] = {}
-        path: List[Package] = []
+        states: dict[Package, State] = {}
+        path: list[Package] = []
 
         async def visit(
             pkg: Package,
@@ -225,16 +221,16 @@ class Package:
     @staticmethod
     @lock
     async def resolve_all(
-        pkgs: Set["Package"],
+        pkgs: set["Package"],
         *,
         upgrade: bool = False,
-    ) -> Set["Package"]:
+    ) -> set["Package"]:
         Package._check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
         await Package._detect_cycles(pkgs, upgrade=upgrade)
 
-        resolved: Set[Package] = set()
+        resolved: set[Package] = set()
         return {
             pkg
             for pkgs in await asyncio.gather(
@@ -245,7 +241,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def install_all(pkgs: Set["Package"], *, upgrade: bool = False) -> None:
+    async def install_all(pkgs: set["Package"], *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
             for pkg in await Package.resolve_all(pkgs, upgrade=upgrade)
@@ -265,7 +261,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def uninstall_all(pkgs: Set["Package"]) -> None:
+    async def uninstall_all(pkgs: set["Package"]) -> None:
         dependents = set()
         for pkg in pkgs:
             dependents.update(pkg.installed_dependents())
@@ -315,10 +311,10 @@ class Package:
             sys.exit(1)
         self.name = name
         self.origin: Optional[Union[str, Path]] = None
-        self._metadata: Optional[Dict[str, Any]] = None
+        self._metadata: Optional[dict[str, Any]] = None
         self._upgrade_available = False
 
-    def _build_steps(self) -> List[str]:
+    def _build_steps(self) -> list[str]:
         assert self._metadata is not None
 
         build = self._metadata.get("build", "wmake")
@@ -396,8 +392,8 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _resolved: Optional[Set["Package"]] = None,
-    ) -> Set["Package"]:
+        _resolved: Optional[set["Package"]] = None,
+    ) -> set["Package"]:
         if _resolved is None:
             _resolved = set()
         elif self in _resolved:
@@ -441,7 +437,7 @@ class Package:
     def is_installed(self) -> bool:
         return self in self.all_installed()
 
-    def installed_binaries(self) -> Set[Path]:
+    def installed_binaries(self) -> set[Path]:
         with lock as installed:
             if not self.is_installed():
                 return set()
@@ -467,11 +463,11 @@ class Package:
             except KeyError:
                 return None
 
-    def requested_dependencies(self) -> Set["Package"]:
+    def requested_dependencies(self) -> set["Package"]:
         assert self._metadata is not None
         return {Package(name) for name in self._metadata.get("requires", [])}
 
-    def installed_dependents(self) -> Set["Package"]:
+    def installed_dependents(self) -> set["Package"]:
         with lock as installed:
             return {
                 Package(name)
@@ -491,7 +487,7 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _deps: Union[bool, Dict["Package", asyncio.Event]] = True,
+        _deps: Union[bool, dict["Package", asyncio.Event]] = True,
     ) -> None:
         with lock as installed:
             if _deps is True:
@@ -587,7 +583,7 @@ class Package:
                     libs = sorted(
                         str(path.relative_to(platform_path() / "lib"))
                         for path in installed_binaries
-                        if is_relative_to(path, platform_path() / "lib")
+                        if path.is_relative_to(platform_path() / "lib")
                     )
                     if libs:
                         installed["packages"][self.name]["libs"] = libs
@@ -595,7 +591,7 @@ class Package:
                     apps = sorted(
                         str(path.relative_to(platform_path() / "bin"))
                         for path in installed_binaries
-                        if is_relative_to(path, platform_path() / "bin")
+                        if path.is_relative_to(platform_path() / "bin")
                     )
                     if apps:
                         installed["packages"][self.name]["apps"] = apps
@@ -686,11 +682,12 @@ class _IndexedPackage(Package):
     async def fetch(self) -> None:
         with Status(f"🔍 Fetching {self}"):
             try:
-                async with aiohttp.ClientSession(
-                    raise_for_status=True
-                ) as session, session.get(
-                    f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
-                ) as response:
+                async with (
+                    aiohttp.ClientSession(raise_for_status=True) as session,
+                    session.get(
+                        f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
+                    ) as response,
+                ):
                     self._metadata = await response.json(content_type="text/plain")
             except Exception as e:  # noqa: BLE001
                 print(
@@ -818,8 +815,8 @@ class _Styro(Package):
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _resolved: Optional[Set["Package"]] = None,
-    ) -> Set["Package"]:
+        _resolved: Optional[set["Package"]] = None,
+    ) -> set["Package"]:
         if not upgrade and not _force_reinstall:
             return set()
 
@@ -843,7 +840,7 @@ class _Styro(Package):
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _deps: Union[bool, Dict[Package, asyncio.Event]] = True,
+        _deps: Union[bool, dict[Package, asyncio.Event]] = True,
     ) -> None:
         if not upgrade and not _force_reinstall:
             print(
