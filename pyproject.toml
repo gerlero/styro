@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "styro"
 description = "Package manager for OpenFOAM"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [{name = "Gabriel S. Gerlero", email = "ggerlero@cimec.unl.edu.ar"}]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -16,7 +16,6 @@ classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -30,7 +29,6 @@ classifiers = [
 dependencies = [
     "aiohttp>=3,<4",
     "cyclopts>=2,<4",
-    "typing_extensions>=3.9,<5; python_version < '3.9'",
 ]
 dynamic = ["version"]
 
