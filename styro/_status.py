@@ -1,26 +1,29 @@
 import asyncio
 import sys
 import time
+from io import TextIOBase
 from types import TracebackType
 from typing import ClassVar, List, Optional, TextIO, Type
 
 
-class _Stream:
-    def __init__(self, stream: TextIO) -> None:
-        self._stream = stream
+class _StreamWrapper(TextIOBase):
+    def __init__(self, stream: TextIO, /) -> None:
+        self._wrapped = stream
 
-    def write(self, data: str) -> None:
+    def write(self, data: str, /) -> int:
         Status.clear()
-        self._stream.write(data)
+        ret = self._wrapped.write(data)
+        self._wrapped.flush()
         Status.display()
+        return ret
 
     def flush(self) -> None:
-        self._stream.flush()
+        self._wrapped.flush()
 
 
 _stdout = sys.stdout
-sys.stdout = _Stream(sys.stdout)
-sys.stderr = _Stream(sys.stderr)
+sys.stdout = _StreamWrapper(sys.stdout)
+sys.stderr = _StreamWrapper(sys.stderr)
 
 
 class Status:
@@ -31,16 +34,16 @@ class Status:
 
     @staticmethod
     def clear() -> None:
-        sys.stdout.flush()
         if Status._printed_lines > 0:
             _stdout.write(f"\033[{Status._printed_lines}A\033[J")
+            _stdout.flush()
         Status._printed_lines = 0
 
     @staticmethod
     def display() -> None:
         Status.clear()
         for status in Status._statuses:
-            text = str(status)
+            text = f"{status.title}{'.' * Status._dots}\n{status.msg}"
             _stdout.write(text)
             Status._printed_lines += text.count("\n")
 
@@ -88,6 +91,3 @@ class Status:
             task.cancel()  # ty: ignore[possibly-unbound-attribute]
             Status._animation_task = None
         Status.display()
-
-    def __str__(self) -> str:
-        return f"{self.title}{'.' * Status._dots}\n{self.msg}"
