@@ -4,16 +4,16 @@ import subprocess
 from collections import deque
 from io import StringIO
 from pathlib import Path
-from typing import Deque, Dict, List, Optional
+from typing import Optional
 
 from ._status import Status
 
 
 async def run(
-    cmd: List[str],
+    cmd: list[str],
     *,
     cwd: Optional[Path] = None,
-    env: Optional[Dict[str, str]] = None,
+    env: Optional[dict[str, str]] = None,
     status: Optional[Status] = None,
 ) -> subprocess.CompletedProcess:
     proc = await asyncio.create_subprocess_exec(  # ty: ignore[missing-argument]
@@ -22,7 +22,7 @@ async def run(
 
     if status is not None:
         cmdstr = f"==> \033[1m{shlex.join(cmd)}\033[0m\n"
-        lines: Deque[str] = deque(maxlen=4)
+        lines: deque[str] = deque(maxlen=4)
 
     output = StringIO()
     error = StringIO()

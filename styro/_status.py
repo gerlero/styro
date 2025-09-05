@@ -3,7 +3,7 @@ import sys
 import time
 from io import TextIOBase
 from types import TracebackType
-from typing import ClassVar, List, Optional, TextIO, Type
+from typing import ClassVar, Optional, TextIO
 
 
 class _StreamWrapper(TextIOBase):
@@ -27,7 +27,7 @@ sys.stderr = _StreamWrapper(sys.stderr)
 
 
 class Status:
-    _statuses: ClassVar[List["Status"]] = []
+    _statuses: ClassVar[list["Status"]] = []
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
     _animation_task: ClassVar[Optional[asyncio.Task]] = None
@@ -80,7 +80,7 @@ class Status:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_value: Optional[BaseException],
         traceback: Optional[TracebackType],
     ) -> None:

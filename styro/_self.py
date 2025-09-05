@@ -33,21 +33,20 @@ async def check_for_new_version(
 ) -> bool:
     try:
         with Status("🔁 Checking for new version"):
-            async with aiohttp.ClientSession(
-                raise_for_status=True, timeout=timeout
-            ) as session, session.get(
-                "https://api.github.com/repos/gerlero/styro/releases/latest",
-            ) as response:
+            async with (
+                aiohttp.ClientSession(
+                    raise_for_status=True, timeout=timeout
+                ) as session,
+                session.get(
+                    "https://api.github.com/repos/gerlero/styro/releases/latest",
+                ) as response,
+            ):
                 contents = await response.json()
                 latest_version = contents["tag_name"]
     except Exception:  # noqa: BLE001
         return False
 
-    if (
-        latest_version := latest_version[1:]
-        if latest_version.startswith("v")
-        else latest_version
-    ) != __version__:
+    if (latest_version := latest_version.removeprefix("v")) != __version__:
         if verbose:
             print(
                 f"⚠️ Warning: you are using styro {__version__}, but version {latest_version} is available.",
@@ -62,11 +61,12 @@ async def check_for_new_version(
 async def selfupgrade() -> None:
     with Status("⏬ Downloading styro"):
         try:
-            async with aiohttp.ClientSession(
-                raise_for_status=True
-            ) as session, session.get(
-                f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
-            ) as response:
+            async with (
+                aiohttp.ClientSession(raise_for_status=True) as session,
+                session.get(
+                    f"https://github.com/gerlero/styro/releases/latest/download/styro-{platform.system()}-{platform.machine()}.tar.gz"
+                ) as response,
+            ):
                 contents = await response.read()
         except Exception as e:  # noqa: BLE001
             print(f"🛑 Error: Failed to download styro: {e}", file=sys.stderr)
