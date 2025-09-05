@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "styro"
-description = "A community package manager for OpenFOAM"
+description = "Package manager for OpenFOAM"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [{name = "Gabriel S. Gerlero", email = "ggerlero@cimec.unl.edu.ar"}]
@@ -27,23 +27,12 @@ classifiers = [
     "Topic :: System :: Software Distribution",
     "Typing :: Typed",
 ]
-
 dependencies = [
     "aiohttp>=3,<4",
     "cyclopts>=2,<4",
     "typing_extensions>=3.9,<5; python_version < '3.9'",
 ]
-
 dynamic = ["version"]
-
-[dependency-groups]
-dev = [
-    "pyinstaller>=5,<7",
-    "pytest>7,<9",
-    "pytest-cov",
-    "ruff",
-    "ty; python_version>='3.8'",
-]
 
 [project.urls]
 Homepage = "https://github.com/gerlero/styro"
@@ -51,6 +40,15 @@ Repository = "https://github.com/gerlero/styro"
 
 [project.scripts]
 styro = "styro.__main__:app"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=5,<7",
+    "pytest>7,<9",
+    "pytest-cov",
+    "ruff",
+    "ty",
+]
 
 [tool.hatch.version]
 path = "styro/__init__.py"
