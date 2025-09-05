@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="https://github.com/gerlero/styro/raw/main/logo.png" alt="styro" width="200"/>
-  
-  **🌊 A community-driven package manager for OpenFOAM**
+  <a href="https://github.com/gerlero/styro"><img src="https://github.com/gerlero/styro/raw/main/logo.png" alt="styro" width="200"/></a>
+
+  **The package manager for OpenFOAM**
 
   Simplify your OpenFOAM workflows with easy package installation, management, and distribution
 </div>
@@ -32,9 +32,11 @@
 
 - **🚀 One-command installation** - Install OpenFOAM packages with a single command
 - **🌎 Community-driven** - Access packages from the [OpenFOAM Package Index (OPI)](https://github.com/exasim-project/opi)
-- **🔄 Keep up to date** - Easy upgrades and dependency resolution
+- **🧩 Broad compatibility** - Works seamlessly with OpenFOAM from [openfoam.com](https://www.openfoam.com) and [openfoam.org](https://www.openfoam.org)
 - **📦 Multiple sources** - Install from OPI, local directories, or Git repositories
+- **🔄 Easy updates** - Upgrade packages with automatic dependency resolution
 - **🛠️ Developer-friendly** - Simple package testing, definition and distribution
+
 
 ## ▶️ Demo
 
