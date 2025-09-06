@@ -53,37 +53,39 @@ Before using **styro**, ensure you have:
 
 ## ⏬ Installation
 
-Choose any of the following methods:
+Choose your preferred method for obtaining **styro**:
 
-* With [pip](https://pypi.org/project/pip/) (requires Python 3.9 or later):
-
-    ```bash
-    pip install styro
-    ```
-
-* With [conda](https://docs.conda.io/en/latest/):
-
-    ```bash
-    conda install -c conda-forge styro
-    ```
-
-* With [Homebrew](https://brew.sh/):
-
-    ```bash
-    brew install gerlero/openfoam/styro
-    ```
-
-* Standalone binary (installs to `$FOAM_USER_APPBIN`):
-
-    ```bash
-    /bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
-    ```
-
-* [Docker](https://www.docker.com) image:
-
-    ```bash
-    docker pull microfluidica/styro
-    ```
+<table>
+<tr>
+  <td>Method</td>
+  <td>Command</td>
+  <td>Notes</td>
+</tr>
+<tr>
+  <td><strong>✨ <a href=https://pypi.org/project/styro/>pip</a></strong></td>
+  <td><code>pip install styro</code></td>
+  <td><i>Requires Python 3.9+</i></td>
+</tr>
+<tr>
+  <td><strong>📄 Standalone install</strong></td>
+  <td><code>/bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"</code></td>
+  <td><i>No package manager required. Installs to <code>$FOAM_USER_APPBIN</code></i></td>
+</tr>
+<tr>
+  <td><strong>🐍 <a href=https://anaconda.org/conda-forge/styro>conda</a></strong></td>
+  <td><code>conda install -c conda-forge styro</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td><strong>🍺 <a href=https://github.com/gerlero/homebrew-openfoam>Homebrew</a></strong></td>
+  <td><code>brew install gerlero/openfoam/styro</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td><strong>🐳 <a href=https://hub.docker.com/r/microfluidica/styor/>Docker</a></strong></td>
+  <td><code>docker pull microfluidica/styro</code></td>
+  <td><i>Includes OpenFOAM</i></td>
+</table>
 
 
 ## 🧑‍💻 Command reference
