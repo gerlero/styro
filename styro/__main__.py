@@ -21,7 +21,7 @@ app = cyclopts.App(help=__doc__, version=_version_callback)  # ty: ignore[unknow
 
 @app.command
 async def install(packages: list[str], /, *, upgrade: bool = False) -> None:
-    """Install OpenFOAM packages from the OpenFOAM Package Index."""
+    """Install OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
 
     if not upgrade or Package("styro") not in pkgs:
