@@ -38,7 +38,6 @@ sys.stderr = _StreamWrapper(sys.stderr)
 class Status:
     _statuses: ClassVar[list[Status]] = []
     _printed_lines: ClassVar[int] = 0
-    _dots: ClassVar[int] = 3
     _animation_task: ClassVar[asyncio.Task | None] = None
 
     @staticmethod
@@ -52,22 +51,29 @@ class Status:
     def display() -> None:
         Status.clear()
         for status in Status._statuses:
-            text = f"{status.title}{'.' * Status._dots}\n{status.msg}"
-            _stdout.write(text)
-            Status._printed_lines += text.count("\n")
+            # Use Rich's spinner-style animation instead of simple dots
+            spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+            spinner_idx = int(time.time() * 8) % len(spinner_chars)
+            spinner = spinner_chars[spinner_idx]
+            
+            if status.msg:
+                text = f"{spinner} {status.title}\n{status.msg}"
+            else:
+                text = f"{spinner} {status.title}"
+            
+            _stdout.write(text + "\n")
+            Status._printed_lines += text.count("\n") + 1
 
     @staticmethod
     async def _animate() -> None:
-        interval = 1
+        interval = 0.125  # 8 FPS to match spinner speed
         last_time = time.perf_counter()
 
         while True:
             elapsed = time.perf_counter() - last_time
 
             if elapsed >= interval:
-                frames_advanced = int(elapsed)
-                Status._dots = (Status._dots + frames_advanced) % 6
-                last_time += frames_advanced * interval
+                last_time = time.perf_counter()
                 Status.display()
 
             await asyncio.sleep(0.05)
@@ -83,7 +89,12 @@ class Status:
     def __enter__(self) -> Self:
         Status._statuses.append(self)
         if len(Status._statuses) == 1:
-            Status._animation_task = asyncio.create_task(Status._animate())
+            # Only start animation if we're in an async context
+            try:
+                Status._animation_task = asyncio.create_task(Status._animate())
+            except RuntimeError:
+                # No event loop running, skip animation
+                Status._animation_task = None
         Status.display()
         return self
 
@@ -96,7 +107,7 @@ class Status:
         Status._statuses.remove(self)
         if not Status._statuses:
             task = Status._animation_task
-            assert task is not None
-            task.cancel()  # ty: ignore[possibly-unbound-attribute]
+            if task is not None:
+                task.cancel()  # ty: ignore[possibly-unbound-attribute]
             Status._animation_task = None
         Status.display()
