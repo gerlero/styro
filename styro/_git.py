@@ -22,13 +22,11 @@ async def _git(
             cwd=cwd,
         )
     except FileNotFoundError:
-        if shutil.which("git") is None:
-            print(
-                "🛑 Error: Git not found. styro needs Git to download packages.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        raise
+        print(
+            "🛑 Error: Git not found. styro needs Git to download packages.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 async def _get_default_branch(repo: Path) -> str:
