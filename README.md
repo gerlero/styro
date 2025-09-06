@@ -53,7 +53,7 @@ Before using **styro**, ensure you have:
 
 Choose any of the following methods:
 
-* With [pip](https://pypi.org/project/pip/) (requires Python 3.8 or later):
+* With [pip](https://pypi.org/project/pip/) (requires Python 3.9 or later):
 
     ```bash
     pip install styro
