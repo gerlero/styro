@@ -1,0 +1,120 @@
+name: Docker
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  IMAGES: ${{ vars.DOCKERHUB_REPOSITORY || github.repository }}
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - openfoam-version: 2506
+            latest-com: true
+            latest-org: false
+          - openfoam-version: 2412
+            latest-com: false
+            latest-org: false
+          - openfoam-version: 13
+            latest-com: false
+            latest-org: true
+          - openfoam-version: 12
+            latest-com: false
+            latest-org: false
+      fail-fast: false
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGES }}
+          tags: |
+            type=ref,event=branch,enable=${{ matrix.latest-com }}
+            type=ref,event=branch,suffix=-openfoam-com,enable=${{ matrix.latest-com }}
+            type=ref,event=branch,suffix=-openfoam-org,enable=${{ matrix.latest-org }}
+            type=ref,event=branch,suffix=-openfoam${{ matrix.openfoam-version }}
+            type=ref,event=pr,enable=${{ matrix.latest-com }}
+            type=ref,event=pr,suffix=-openfoam-com,enable=${{ matrix.latest-com }}
+            type=ref,event=pr,suffix=-openfoam-org,enable=${{ matrix.latest-org }}
+            type=ref,event=pr,suffix=-openfoam${{ matrix.openfoam-version }}
+            type=pep440,pattern={{version}},enable=${{ matrix.latest-com }}
+            type=pep440,pattern={{version}}-openfoam-com,enable=${{ matrix.latest-com }}
+            type=pep440,pattern={{version}}-openfoam-org,enable=${{ matrix.latest-org }}
+            type=pep440,pattern={{version}}-openfoam${{ matrix.openfoam-version }}
+            type=pep440,pattern={{major}}.{{minor}},enable=${{ matrix.latest-com }}
+            type=pep440,pattern={{major}}.{{minor}}-openfoam-com,enable=${{ matrix.latest-com }}
+            type=pep440,pattern={{major}}.{{minor}}-openfoam-org,enable=${{ matrix.latest-org }}
+            type=pep440,pattern={{major}}.{{minor}}-openfoam${{ matrix.openfoam-version }}
+            type=pep440,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') && matrix.latest-com }}
+            type=pep440,pattern={{major}}-openfoam-com,enable=${{ !startsWith(github.ref, 'refs/tags/v0.') && matrix.latest-com }}
+            type=pep440,pattern={{major}}-openfoam-org,enable=${{ !startsWith(github.ref, 'refs/tags/v0.') && matrix.latest-org }}
+            type=pep440,pattern={{major}}-openfoam${{ matrix.openfoam-version }},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+            type=pep440,pattern=latest,enable=${{ matrix.latest-com }}
+            type=pep440,pattern=openfoam-com,enable=${{ matrix.latest-com }}
+            type=pep440,pattern=openfoam-org,enable=${{ matrix.latest-org }}
+            type=pep440,pattern=openfoam${{ matrix.openfoam-version }}
+          flavor: latest=false
+      - name: Login to GitHub Container Registry
+        continue-on-error: ${{ github.event_name != 'push' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to DockerHub
+        if: vars.DOCKERHUB_REPOSITORY
+        continue-on-error: ${{ github.event_name != 'push' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-amd64
+            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-arm64
+          push: ${{ github.event_name == 'push' }}
+          build-args: |
+            BASE=openfoam
+            OPENFOAM_VERSION=${{ matrix.openfoam-version }}
+      - name: Push build cache (amd64)
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-amd64,mode=max
+          build-args: |
+            BASE=openfoam
+            OPENFOAM_VERSION=${{ matrix.openfoam-version }}
+      - name: Push build cache (arm64)
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/arm64
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-arm64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-openfoam${{ matrix.openfoam-version }}-arm64,mode=max
+          build-args: |
+            BASE=openfoam
+            OPENFOAM_VERSION=${{ matrix.openfoam-version }}
