@@ -18,7 +18,7 @@ app = cyclopts.App(help=__doc__, version=_version_callback)  # ty: ignore[unknow
 
 
 @app.command
-async def install(packages: list[str], *, upgrade: bool = False) -> None:
+async def install(packages: list[str], /, *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages from the OpenFOAM Package Index."""
     pkgs = {Package(pkg) for pkg in packages}
 
@@ -29,7 +29,7 @@ async def install(packages: list[str], *, upgrade: bool = False) -> None:
 
 
 @app.command
-async def uninstall(packages: list[str]) -> None:
+async def uninstall(packages: list[str], /) -> None:
     """Uninstall OpenFOAM packages."""
     pkgs = {Package(pkg) for pkg in packages}
 
