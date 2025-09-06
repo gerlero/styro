@@ -107,7 +107,7 @@ Choose any of the following methods:
 styro install cfmesh
 ```
 
-### 🖥️ Local Packages
+### 🖥️ Local packages
 
 Install packages from your local filesystem:
 
@@ -117,7 +117,7 @@ styro install /path/to/my-custom-package
 
 **Pro tip:** Add a [`metadata.json`](https://github.com/exasim-project/opi/blob/main/metadata.json) file to the package directory to customize installation behavior.
 
-### 🌎 Git Repositories
+### 🌎 Git repositories
 
 Install directly from any Git repository:
 
