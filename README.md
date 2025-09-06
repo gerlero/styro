@@ -19,6 +19,7 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Publish](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/pypi-publish.yml)
 [![Binaries](https://github.com/gerlero/styro/actions/workflows/binaries.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/binaries.yml)
+[![Docker](https://github.com/gerlero/styro/actions/workflows/docker.yml/badge.svg)](https://github.com/gerlero/styro/actions/workflows/docker.yml)
 
 </div>
 
