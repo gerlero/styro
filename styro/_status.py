@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import sys
-import time
 from io import TextIOBase
 from typing import TYPE_CHECKING, ClassVar, TextIO
+
+from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -20,10 +22,10 @@ class _StreamWrapper(TextIOBase):
         self._wrapped = stream
 
     def write(self, data: str, /) -> int:
-        Status.clear()
+        Status.interrupt()
         ret = self._wrapped.write(data)
         self._wrapped.flush()
-        Status.display()
+        Status.resume()
         return ret
 
     def flush(self) -> None:
@@ -37,46 +39,35 @@ sys.stderr = _StreamWrapper(sys.stderr)
 
 class Status:
     _statuses: ClassVar[list[Status]] = []
-    _printed_lines: ClassVar[int] = 0
-    _animation_task: ClassVar[asyncio.Task | None] = None
+    _live: ClassVar[Live | None] = None
+    _console: ClassVar[Console] = Console(file=_stdout)
 
     @staticmethod
-    def clear() -> None:
-        if Status._printed_lines > 0:
-            _stdout.write(f"\033[{Status._printed_lines}A\033[J")
-            _stdout.flush()
-        Status._printed_lines = 0
+    def interrupt() -> None:
+        """Temporarily interrupt the live display for stream output."""
+        if Status._live and Status._live.is_started:
+            Status._live.stop()
 
     @staticmethod
-    def display() -> None:
-        Status.clear()
+    def resume() -> None:
+        """Resume the live display after stream output."""
+        if Status._live and not Status._live.is_started and Status._statuses:
+            Status._live.start()
+
+    @staticmethod
+    def _get_current_display_text() -> str:
+        """Generate the text to display based on current statuses."""
+        if not Status._statuses:
+            return ""
+        
+        lines = []
         for status in Status._statuses:
-            # Use Rich's spinner-style animation instead of simple dots
-            spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-            spinner_idx = int(time.time() * 8) % len(spinner_chars)
-            spinner = spinner_chars[spinner_idx]
-            
             if status.msg:
-                text = f"{spinner} {status.title}\n{status.msg}"
+                lines.append(f"{status.title}\n{status.msg}")
             else:
-                text = f"{spinner} {status.title}"
-            
-            _stdout.write(text + "\n")
-            Status._printed_lines += text.count("\n") + 1
-
-    @staticmethod
-    async def _animate() -> None:
-        interval = 0.125  # 8 FPS to match spinner speed
-        last_time = time.perf_counter()
-
-        while True:
-            elapsed = time.perf_counter() - last_time
-
-            if elapsed >= interval:
-                last_time = time.perf_counter()
-                Status.display()
-
-            await asyncio.sleep(0.05)
+                lines.append(status.title)
+        
+        return "\n".join(lines)
 
     def __init__(self, title: str) -> None:
         self.title = title
@@ -84,18 +75,30 @@ class Status:
 
     def __call__(self, msg: str) -> None:
         self.msg = msg
-        Status.display()
+        if Status._live:
+            Status._live.update(
+                Spinner("dots", text=Status._get_current_display_text())
+            )
 
     def __enter__(self) -> Self:
         Status._statuses.append(self)
         if len(Status._statuses) == 1:
-            # Only start animation if we're in an async context
+            # Create and start the live display with a spinner
+            Status._live = Live(
+                Spinner("dots", text=Status._get_current_display_text()),
+                console=Status._console,
+                refresh_per_second=8,
+                transient=True
+            )
             try:
-                Status._animation_task = asyncio.create_task(Status._animate())
-            except RuntimeError:
-                # No event loop running, skip animation
-                Status._animation_task = None
-        Status.display()
+                Status._live.start()
+            except Exception:
+                # If we can't start live display, continue without it
+                Status._live = None
+        elif Status._live:
+            Status._live.update(
+                Spinner("dots", text=Status._get_current_display_text())
+            )
         return self
 
     def __exit__(
@@ -106,8 +109,10 @@ class Status:
     ) -> None:
         Status._statuses.remove(self)
         if not Status._statuses:
-            task = Status._animation_task
-            if task is not None:
-                task.cancel()  # ty: ignore[possibly-unbound-attribute]
-            Status._animation_task = None
-        Status.display()
+            if Status._live:
+                Status._live.stop()
+                Status._live = None
+        elif Status._live:
+            Status._live.update(
+                Spinner("dots", text=Status._get_current_display_text())
+            )
