@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 __version__ = "0.1.19"
 
 import asyncio
@@ -9,11 +11,15 @@ import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Optional, Union
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 import aiohttp
 
@@ -28,6 +34,9 @@ from ._self import (
 from ._status import Status
 from ._subprocess import run
 from ._util import path_from_uri, reentrantcontextmanager
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @reentrantcontextmanager
@@ -76,7 +85,7 @@ class Package:
     )
 
     @staticmethod
-    def _check_for_duplicate_names(pkgs: set["Package"]) -> None:
+    def _check_for_duplicate_names(pkgs: set[Package]) -> None:
         duplicate_names = {
             pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
         }
@@ -105,7 +114,7 @@ class Package:
     @staticmethod
     def parse_package(
         package: str,
-    ) -> Union[tuple[str, None], tuple[None, str], tuple[str, str]]:
+    ) -> tuple[str, None] | tuple[None, str] | tuple[str, str]:
         name = package.lower().replace("_", "-")
         if Package.__name_regex.match(name):
             return name, None
@@ -123,12 +132,12 @@ class Package:
         return None, package
 
     @staticmethod
-    def all_installed() -> set["Package"]:
+    def all_installed() -> set[Package]:
         with lock as installed:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
-    async def _detect_cycles(pkgs: set["Package"], *, upgrade: bool = False) -> None:
+    async def _detect_cycles(pkgs: set[Package], *, upgrade: bool = False) -> None:
         """
         Detect cycles in the dependency graph before installation.
 
@@ -221,10 +230,10 @@ class Package:
     @staticmethod
     @lock
     async def resolve_all(
-        pkgs: set["Package"],
+        pkgs: set[Package],
         *,
         upgrade: bool = False,
-    ) -> set["Package"]:
+    ) -> set[Package]:
         Package._check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
@@ -241,7 +250,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def install_all(pkgs: set["Package"], *, upgrade: bool = False) -> None:
+    async def install_all(pkgs: set[Package], *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
             for pkg in await Package.resolve_all(pkgs, upgrade=upgrade)
@@ -261,7 +270,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def uninstall_all(pkgs: set["Package"]) -> None:
+    async def uninstall_all(pkgs: set[Package]) -> None:
         dependents = set()
         for pkg in pkgs:
             dependents.update(pkg.installed_dependents())
@@ -277,7 +286,7 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
-    def __new__(cls, package: str) -> "Package":
+    def __new__(cls, package: str) -> Self:
         if cls is not Package:
             return super().__new__(cls)
 
@@ -310,8 +319,8 @@ class Package:
             )
             sys.exit(1)
         self.name = name
-        self.origin: Optional[Union[str, Path]] = None
-        self._metadata: Optional[dict[str, Any]] = None
+        self.origin: str | Path | None = None
+        self._metadata: dict[str, Any] | None = None
         self._upgrade_available = False
 
     def _build_steps(self) -> list[str]:
@@ -392,8 +401,8 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _resolved: Optional[set["Package"]] = None,
-    ) -> set["Package"]:
+        _resolved: set[Package] | None = None,
+    ) -> set[Package]:
         if _resolved is None:
             _resolved = set()
         elif self in _resolved:
@@ -454,7 +463,7 @@ class Package:
             except KeyError:
                 return set()
 
-    def installed_sha(self) -> Optional[str]:
+    def installed_sha(self) -> str | None:
         with lock as installed:
             if not self.is_installed():
                 return None
@@ -463,11 +472,11 @@ class Package:
             except KeyError:
                 return None
 
-    def requested_dependencies(self) -> set["Package"]:
+    def requested_dependencies(self) -> set[Package]:
         assert self._metadata is not None
         return {Package(name) for name in self._metadata.get("requires", [])}
 
-    def installed_dependents(self) -> set["Package"]:
+    def installed_dependents(self) -> set[Package]:
         with lock as installed:
             return {
                 Package(name)
@@ -479,7 +488,7 @@ class Package:
     def _pkg_path(self) -> Path:
         return platform_path() / "styro" / "pkg" / self.name
 
-    async def download(self) -> Optional[str]:
+    async def download(self) -> str | None:
         raise NotImplementedError
 
     async def install(
@@ -487,7 +496,7 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _deps: Union[bool, dict["Package", asyncio.Event]] = True,
+        _deps: bool | dict[Package, asyncio.Event] = True,
     ) -> None:
         with lock as installed:
             if _deps is True:
@@ -815,8 +824,8 @@ class _Styro(Package):
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _resolved: Optional[set["Package"]] = None,
-    ) -> set["Package"]:
+        _resolved: set[Package] | None = None,
+    ) -> set[Package]:
         if not upgrade and not _force_reinstall:
             return set()
 
@@ -840,7 +849,7 @@ class _Styro(Package):
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _deps: Union[bool, dict[Package, asyncio.Event]] = True,
+        _deps: bool | dict[Package, asyncio.Event] = True,
     ) -> None:
         if not upgrade and not _force_reinstall:
             print(

@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import shutil
 import subprocess
-from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from ._subprocess import run
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 async def _get_default_branch(repo: Path) -> str:
@@ -26,7 +30,7 @@ async def _set_remote_url(repo: Path, url: str) -> None:
     )
 
 
-async def fetch(repo: Path, url: str, *, missing_ok: bool = True) -> Optional[str]:
+async def fetch(repo: Path, url: str, *, missing_ok: bool = True) -> str | None:
     try:
         await _set_remote_url(repo, url)
         branch = await _get_default_branch(repo)

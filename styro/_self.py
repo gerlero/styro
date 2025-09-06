@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import io
 import platform
 import sys
 import tarfile
 from pathlib import Path
-from typing import Optional
 
 import aiohttp
 
@@ -29,7 +30,7 @@ def print_upgrade_instruction() -> None:
 
 
 async def check_for_new_version(
-    *, timeout: Optional[int] = None, verbose: bool = False
+    *, timeout: int | None = None, verbose: bool = False
 ) -> bool:
     try:
         with Status("🔁 Checking for new version"):

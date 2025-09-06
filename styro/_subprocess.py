@@ -1,20 +1,25 @@
+from __future__ import annotations
+
 import asyncio
 import shlex
 import subprocess
 from collections import deque
 from io import StringIO
-from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from ._status import Status
+if TYPE_CHECKING:
+    from pathlib import Path
+
+if TYPE_CHECKING:
+    from ._status import Status
 
 
 async def run(
     cmd: list[str],
     *,
-    cwd: Optional[Path] = None,
-    env: Optional[dict[str, str]] = None,
-    status: Optional[Status] = None,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    status: Status | None = None,
 ) -> subprocess.CompletedProcess:
     proc = await asyncio.create_subprocess_exec(  # ty: ignore[missing-argument]
         *cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE

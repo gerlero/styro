@@ -29,6 +29,7 @@ classifiers = [
 dependencies = [
     "aiohttp>=3,<4",
     "cyclopts>=2,<4",
+    "typing_extensions>=4,<5; python_version < '3.11'",
 ]
 dynamic = ["version"]
 
@@ -61,8 +62,6 @@ extend-ignore = [
     "COM812",
     "D",
     "E501",
-    "FA100",
-    "PERF203",
     "PLR0912",
     "PLR0915",
     "S101",

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import os
 import sys
-from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ._util import get_changed_files
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 def platform_path() -> Path:
