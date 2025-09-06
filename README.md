@@ -43,6 +43,7 @@
 
 ![Demo](https://github.com/gerlero/styro/raw/main/demo.gif)
 
+
 ## 📋 Requirements
 
 Before using **styro**, ensure you have:
@@ -78,6 +79,11 @@ Choose any of the following methods:
     /bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
     ```
 
+* [Docker](https://www.docker.com) image:
+
+    ```bash
+    docker pull microfluidica/styro
+    ```
 
 
 ## 🧑‍💻 Command reference
