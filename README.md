@@ -82,7 +82,7 @@ Choose your preferred method for obtaining **styro**:
   <td></td>
 </tr>
 <tr>
-  <td><strong>🐳 <a href=https://hub.docker.com/r/microfluidica/styor/>Docker</a></strong></td>
+  <td><strong>🐳 <a href=https://hub.docker.com/r/microfluidica/styro/>Docker</a></strong></td>
   <td><code>docker pull microfluidica/styro</code></td>
   <td><i>Includes OpenFOAM</i></td>
 </table>
