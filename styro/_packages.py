@@ -14,7 +14,7 @@ import sys
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 if sys.version_info >= (3, 11):
     from typing import NotRequired, Self, TypedDict
