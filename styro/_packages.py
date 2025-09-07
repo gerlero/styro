@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if sys.version_info >= (3, 11):
-    from typing import Self
+    from typing import NotRequired, Self, TypedDict
 else:
-    from typing_extensions import Self
+    from typing_extensions import NotRequired, Self, TypedDict
 
 import aiohttp
 
@@ -39,8 +39,31 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
+class PackageMetadata(TypedDict):
+    """TypedDict for package metadata structure."""
+    repo: NotRequired[str]  # Repository URL (required for indexed packages)
+    build: NotRequired[str | list[str]]  # Build system, defaults to "wmake"
+    version: NotRequired[list[str]]  # Version specifications
+    requires: NotRequired[list[str]]  # Dependencies
+
+
+class InstalledPackageInfo(TypedDict):
+    """TypedDict for installed package information in installed.json."""
+    origin: NotRequired[str]  # Package origin (URL or file path)
+    sha: NotRequired[str]  # Git SHA of the installed version
+    apps: NotRequired[list[str]]  # List of installed applications
+    libs: NotRequired[list[str]]  # List of installed libraries
+    requires: NotRequired[list[str]]  # List of dependencies
+
+
+class InstalledData(TypedDict):
+    """TypedDict for the installed.json structure."""
+    version: NotRequired[int]  # Schema version
+    packages: NotRequired[dict[str, InstalledPackageInfo]]  # Installed packages
+
+
 @reentrantcontextmanager
-def _lock() -> Generator[dict[str, Any], None, None]:
+def _lock() -> Generator[InstalledData, None, None]:
     installed_path = platform_path() / "styro" / "installed.json"
 
     installed_path.parent.mkdir(parents=True, exist_ok=True)
@@ -320,7 +343,7 @@ class Package:
             sys.exit(1)
         self.name = name
         self.origin: str | Path | None = None
-        self._metadata: dict[str, Any] | None = None
+        self._metadata: PackageMetadata | None = None
         self._upgrade_available = False
 
     def _build_steps(self) -> list[str]:
