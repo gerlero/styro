@@ -7,10 +7,8 @@ import cyclopts
 from . import __version__
 from ._packages import Package
 from ._self import check_for_new_version
-from ._util import async_to_sync
 
 
-@async_to_sync
 async def _version_callback() -> str:
     await check_for_new_version(verbose=True)
     return f"styro {__version__}"
