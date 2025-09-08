@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from contextlib import contextmanager
 from functools import wraps
@@ -9,23 +8,11 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from urllib.parse import unquote, urlparse
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine, Generator
+    from collections.abc import Callable, Generator
     from types import TracebackType
 
 R = TypeVar("R")
 S = TypeVar("S")
-
-
-def async_to_sync(coro: Callable[..., Coroutine[Any, Any, R]]) -> Callable[..., R]:
-    """
-    Decorator to convert an asynchronous function to a synchronous one.
-    """
-
-    @wraps(coro)
-    def wrapper(*args: Any, **kwargs: Any) -> R:  # noqa: ANN401
-        return asyncio.run(coro(*args, **kwargs))
-
-    return wrapper
 
 
 class _ReentrantContextManager(Generic[R]):
