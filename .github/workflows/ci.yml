@@ -45,20 +45,20 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         openfoam-version: [9, 13, 2006, 2506]
-        python-version: ['3.9', '3.13']
+        python-version: ['3.9', '3.14']
         include:
           - os: macos-latest
             openfoam-version: 2112
             python-version: '3.9'
           - os: macos-latest
             openfoam-version: 2112
-            python-version: '3.13'
+            python-version: '3.14'
           - os: macos-latest
             openfoam-version: 2506
             python-version: '3.9'
           - os: macos-latest
             openfoam-version: 2506
-            python-version: '3.13'
+            python-version: '3.14'
       fail-fast: false
     steps:
     - name: Checkout
