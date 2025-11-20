@@ -44,7 +44,7 @@ styro = "styro.__main__:app"
 [dependency-groups]
 dev = [
     "pyinstaller>=5,<7",
-    "pytest>7,<9",
+    "pytest>=8,<10",
     "pytest-cov",
     "ruff",
     "ty",
