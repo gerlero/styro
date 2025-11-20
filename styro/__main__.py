@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import cyclopts
 
-from . import __version__
-from ._packages import Package
-from ._self import check_for_new_version
+from styro import __version__
+from styro._packages import Package
+from styro._self import check_for_new_version
 
 
 async def _version_callback() -> str:

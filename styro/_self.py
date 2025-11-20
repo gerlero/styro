@@ -8,8 +8,8 @@ from pathlib import Path
 
 import aiohttp
 
-from . import __version__
-from ._status import Status
+from styro import __version__
+from styro._status import Status
 
 
 def is_managed_installation() -> bool:

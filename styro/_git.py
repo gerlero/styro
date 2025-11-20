@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from ._subprocess import run
+from styro._subprocess import run
 
 if TYPE_CHECKING:
     from pathlib import Path
