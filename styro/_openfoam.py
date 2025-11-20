@@ -6,7 +6,7 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ._util import get_changed_files
+from styro._util import get_changed_files
 
 if TYPE_CHECKING:
     from collections.abc import Generator

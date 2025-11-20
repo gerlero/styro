@@ -23,17 +23,17 @@ else:
 
 import aiohttp
 
-from ._git import clone, fetch
-from ._openfoam import get_changed_binaries, openfoam_version, platform_path
-from ._self import (
+from styro._git import clone, fetch
+from styro._openfoam import get_changed_binaries, openfoam_version, platform_path
+from styro._self import (
     check_for_new_version,
     is_managed_installation,
     print_upgrade_instruction,
     selfupgrade,
 )
-from ._status import Status
-from ._subprocess import run
-from ._util import path_from_uri, reentrantcontextmanager
+from styro._status import Status
+from styro._subprocess import run
+from styro._util import path_from_uri, reentrantcontextmanager
 
 if TYPE_CHECKING:
     from collections.abc import Generator

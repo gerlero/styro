@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 if TYPE_CHECKING:
-    from ._status import Status
+    from styro._status import Status
 
 
 async def run(
