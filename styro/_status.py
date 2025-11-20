@@ -97,6 +97,6 @@ class Status:
         if not Status._statuses:
             task = Status._animation_task
             assert task is not None
-            task.cancel()  # ty: ignore[possibly-unbound-attribute]
+            task.cancel()
             Status._animation_task = None
         Status.display()
