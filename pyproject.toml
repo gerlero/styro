@@ -4,6 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "styro"
+version = "0.1.30"
 description = "Package manager for OpenFOAM"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -32,7 +33,6 @@ dependencies = [
     "cyclopts>=3.24,<5",
     "typing_extensions>=4,<5; python_version < '3.11'",
 ]
-dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/gerlero/styro"
@@ -49,9 +49,6 @@ dev = [
     "ruff",
     "ty",
 ]
-
-[tool.hatch.version]
-path = "styro/__init__.py"
 
 [tool.ruff.lint]
 extend-select = ["ALL"]
