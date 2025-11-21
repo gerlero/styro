@@ -31,7 +31,7 @@ jobs:
         python-version-file: pyproject.toml
     - name: Build binary
       run: |
-        uv run pyinstaller --onefile run.py --name styro
+        uv run pyinstaller --onefile styro/__main__.py --name styro
     - name: Upload binary artifact
       uses: actions/upload-artifact@v5
       with:
