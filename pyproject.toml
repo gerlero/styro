@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9,<0.10"]
+build-backend = "uv_build"
 
 [project]
 name = "styro"
@@ -49,6 +49,9 @@ dev = [
     "ruff",
     "ty",
 ]
+
+[tool.uv.build-backend]
+module-root = "."
 
 [tool.ruff.lint]
 extend-select = ["ALL"]
