@@ -50,9 +50,6 @@ dev = [
     "ty",
 ]
 
-[tool.uv.build-backend]
-module-root = "."
-
 [tool.ruff.lint]
 extend-select = ["ALL"]
 extend-ignore = [
