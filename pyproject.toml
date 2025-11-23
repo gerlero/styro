@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "styro"
-version = "0.1.31"
+version = "0.1.32"
 license = "GPL-3.0-only"
 license-files = ["LICENSE.txt"]
 description = "Package manager for OpenFOAM"
