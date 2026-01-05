@@ -22,10 +22,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - openfoam-version: 2506
+          - openfoam-version: 2512
             latest-com: true
             latest-org: false
-          - openfoam-version: 2412
+          - openfoam-version: 2506
             latest-com: false
             latest-org: false
           - openfoam-version: 13
