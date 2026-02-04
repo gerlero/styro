@@ -76,7 +76,7 @@ Choose any of the following methods:
 * Standalone binary (installs to `$FOAM_USER_APPBIN`):
 
     ```bash
-    /bin/sh -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
+    /bin/bash -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
     ```
 
 * [Docker](https://www.docker.com) image:
