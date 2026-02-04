@@ -85,7 +85,7 @@ async def clone(repo: Path, url: str) -> str:
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
         shutil.rmtree(repo, ignore_errors=True)
-        repo.mkdir(parents=True)
+        repo.mkdir(parents=True)  # noqa: ASYNC240
         await _git(
             ["clone", url, "."],
             cwd=repo,
