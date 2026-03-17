@@ -426,7 +426,7 @@ class Package:
         ):
             return set()
 
-        ret = {self}
+        ret: set[Package] = {self}
 
         dependencies = await asyncio.gather(
             *(
