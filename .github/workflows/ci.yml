@@ -54,10 +54,10 @@ jobs:
             openfoam-version: 2112
             python-version: '3.14'
           - os: macos-latest
-            openfoam-version: 2512
+            openfoam-version: 2606
             python-version: '3.9'
           - os: macos-latest
-            openfoam-version: 2512
+            openfoam-version: 2606
             python-version: '3.14'
       fail-fast: false
     steps:
