@@ -4,13 +4,8 @@ import sys
 from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 from urllib.parse import unquote, urlparse
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
 
 if sys.version_info >= (3, 12):
     from typing import override

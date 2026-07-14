@@ -2,24 +2,16 @@ import os
 from pathlib import Path
 from subprocess import run
 
-import cyclopts
 import pytest
 
 from styro.__main__ import app
 
 
-def _app(args: list[str]) -> None:
-    if cyclopts.__version__.startswith("3."):
-        app(args)
-    else:
-        app(args, result_action="return_value")
-
-
 def test_styro() -> None:
-    _app(["install", "styro"])
+    app(["install", "styro"], result_action="return_value")
 
     with pytest.raises(SystemExit) as e:
-        _app(["uninstall", "styro"])
+        app(["uninstall", "styro"], result_action="return_value")
     assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
@@ -29,26 +21,30 @@ def test_styro() -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_install(tmp_path: Path) -> None:
-    _app(["uninstall", "reagency"])
+    app(["uninstall", "reagency"], result_action="return_value")
 
-    _app(["install", "reagency"])
+    app(["install", "reagency"], result_action="return_value")
 
-    _app(["freeze"])
+    app(["freeze"], result_action="return_value")
 
     run(
         ["git", "clone", "https://github.com/gerlero/reagency.git"],
         cwd=tmp_path,
         check=True,
     )
-    _app(["install", str(tmp_path / "reagency")])
+    app(["install", str(tmp_path / "reagency")], result_action="return_value")
 
-    _app(["freeze"])
+    app(["freeze"], result_action="return_value")
 
-    _app(["install", "https://github.com/gerlero/reagency.git"])
-    _app(["freeze"])
+    app(
+        ["install", "https://github.com/gerlero/reagency.git"],
+        result_action="return_value",
+    )
 
-    _app(["uninstall", "reagency"])
-    _app(["freeze"])
+    app(["freeze"], result_action="return_value")
+
+    app(["uninstall", "reagency"], result_action="return_value")
+    app(["freeze"], result_action="return_value")
 
 
 @pytest.mark.skipif(
@@ -56,14 +52,16 @@ def test_install(tmp_path: Path) -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_package_with_dependencies() -> None:
-    _app(["uninstall", "porousmicrotransport", "reaagency"])
+    app(
+        ["uninstall", "porousmicrotransport", "reaagency"], result_action="return_value"
+    )
 
-    _app(["install", "porousmicrotransport"])
+    app(["install", "porousmicrotransport"], result_action="return_value")
 
-    _app(["freeze"])
+    app(["freeze"], result_action="return_value")
     with pytest.raises(SystemExit) as e:
-        _app(["uninstall", "reagency"])
+        app(["uninstall", "reagency"], result_action="return_value")
     assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
-    _app(["uninstall", "reagency", "porousmicrotransport"])
+    app(["uninstall", "reagency", "porousmicrotransport"], result_action="return_value")
