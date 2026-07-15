@@ -28,10 +28,10 @@ jobs:
           - openfoam-version: 2512
             latest-com: false
             latest-org: false
-          - openfoam-version: 13
+          - openfoam-version: 14
             latest-com: false
             latest-org: true
-          - openfoam-version: 12
+          - openfoam-version: 13
             latest-com: false
             latest-org: false
       fail-fast: false
