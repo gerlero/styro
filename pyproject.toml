@@ -50,16 +50,3 @@ dev = [
     "ruff",
     "ty",
 ]
-
-[tool.ruff.lint]
-extend-select = ["ALL"]
-extend-ignore = [
-    "C901",
-    "COM812",
-    "D",
-    "E501",
-    "PLR0912",
-    "PLR0915",
-    "S101",
-    "T201",
-]

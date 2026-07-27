@@ -50,7 +50,7 @@ class _ReentrantContextManager(Generic[R]):
 
     def __call__(self, func: Callable[..., S]) -> Callable[..., S]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> S:  # noqa: ANN401
+        def wrapper(*args: Any, **kwargs: Any) -> S:
             with self:
                 return func(*args, **kwargs)
 
@@ -61,7 +61,7 @@ def reentrantcontextmanager(
     func: Callable[..., Generator[R, None, None]],
 ) -> Callable[..., _ReentrantContextManager[R]]:
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> _ReentrantContextManager:  # noqa: ANN401
+    def wrapper(*args: Any, **kwargs: Any) -> _ReentrantContextManager:
         return _ReentrantContextManager(lambda: func(*args, **kwargs))
 
     return wrapper

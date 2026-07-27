@@ -377,7 +377,7 @@ class Package:
                 )
                 continue
 
-            if (openfoam_version() < 1000) == (version < 1000):  # noqa: PLR2004
+            if (openfoam_version() < 1000) == (version < 1000):
                 distro_compatible = True
                 if not compatible:
                     print(
