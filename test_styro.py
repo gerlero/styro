@@ -23,7 +23,7 @@ def test_styro() -> None:
 
 
 @pytest.mark.skipif(
-    int(os.environ.get("FOAM_API", "0")) < 2112,  # noqa: PLR2004
+    int(os.environ.get("FOAM_API", "0")) < 2112,
     reason="requires OpenFOAM v2112 or later",
 )
 def test_install(tmp_path: Path) -> None:
@@ -34,7 +34,7 @@ def test_install(tmp_path: Path) -> None:
     app(["freeze"], **RESULT_KWARG)
 
     run(
-        ["git", "clone", "https://github.com/gerlero/reagency.git"],  # noqa: S607
+        ["git", "clone", "https://github.com/gerlero/reagency.git"],
         cwd=tmp_path,
         check=True,
     )
@@ -53,7 +53,7 @@ def test_install(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    int(os.environ.get("FOAM_API", "0")) < 2112,  # noqa: PLR2004
+    int(os.environ.get("FOAM_API", "0")) < 2112,
     reason="requires OpenFOAM v2112 or later",
 )
 def test_package_with_dependencies() -> None:
