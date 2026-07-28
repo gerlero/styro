@@ -16,11 +16,6 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
 import aiohttp
 
 from styro._git import clone, fetch
@@ -286,7 +281,7 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
-    def __new__(cls, package: str) -> Self:
+    def __new__(cls, package: str) -> Package:  # noqa: PYI034
         if cls is not Package:
             return super().__new__(cls)
 
