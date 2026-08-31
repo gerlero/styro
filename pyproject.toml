@@ -46,7 +46,7 @@ styro = "styro.__main__:app"
 dev = [
     "pyinstaller>=5,<7",
     "pytest>=8,<10",
-    "pytest-cov",
-    "ruff",
-    "ty",
+    "pytest-cov>=7,<8",
+    "ruff>=0.16.5,<0.17",
+    "ty>=0.0.76,<0.1",
 ]
