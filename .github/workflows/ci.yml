@@ -46,19 +46,24 @@ jobs:
         os: [ubuntu-22.04]
         openfoam-version: [9, 14, 2006, 2606]
         python-version: ['3.9', '3.14']
+        dependency-resolution: [highest, lowest-direct]
         include:
           - os: macos-latest
             openfoam-version: 2112
             python-version: '3.9'
+            dependency-resolution: lowest-direct
           - os: macos-latest
             openfoam-version: 2112
             python-version: '3.14'
+            dependency-resolution: highest
           - os: macos-latest
             openfoam-version: 2606
             python-version: '3.9'
+            dependency-resolution: lowest-direct
           - os: macos-latest
             openfoam-version: 2606
             python-version: '3.14'
+            dependency-resolution: highest
       fail-fast: false
     steps:
     - name: Checkout
@@ -75,7 +80,7 @@ jobs:
         openfoam-version: ${{ matrix.openfoam-version }}
     - name: Install test dependencies
       run: |
-        uv sync
+        uv sync --python ${{ matrix.python-version }} --resolution ${{ matrix.dependency-resolution }}
     - name: Test with pytest
       run: |
         uv run pytest --cov=styro --cov-report xml
