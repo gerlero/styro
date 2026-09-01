@@ -36,8 +36,7 @@ jobs:
       with:
         python-version-file: pyproject.toml
     - name: Check types with ty
-      run: |
-        uv run ty check
+      run: uv run ty check
 
   test:
     runs-on: ${{ matrix.os }}
@@ -78,12 +77,12 @@ jobs:
       uses: gerlero/setup-openfoam@v1
       with:
         openfoam-version: ${{ matrix.openfoam-version }}
-    - name: Install test dependencies
-      run: |
-        uv sync --python ${{ matrix.python-version }} --resolution ${{ matrix.dependency-resolution }}
     - name: Test with pytest
-      run: |
-        uv run pytest --cov=styro --cov-report xml
+      run: >
+        uv run
+        --python ${{ matrix.python-version }}
+        --resolution ${{ matrix.dependency-resolution }}
+        pytest --cov=styro --cov-report xml
     - name: Upload code coverage results to Codecov
       uses: codecov/codecov-action@v7
       with:
@@ -97,5 +96,4 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v10.0.1
     - name: Check package build
-      run: |
-        uv build
+      run: uv build

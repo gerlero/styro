@@ -1,23 +1,25 @@
 import os
-import sys
 from pathlib import Path
 from subprocess import run
 
+import cyclopts
 import pytest
 
 from styro.__main__ import app
 
-if sys.version_info >= (3, 10):
-    RESULT_KWARG = {"result_action": "return_value"}
-else:
-    RESULT_KWARG = {}
+
+def _app(args: list[str]) -> None:
+    if cyclopts.__version__.startswith("3."):
+        app(args)
+    else:
+        app(args, result_action="return_value")
 
 
 def test_styro() -> None:
-    app(["install", "styro"], **RESULT_KWARG)
+    _app(["install", "styro"])
 
     with pytest.raises(SystemExit) as e:
-        app(["uninstall", "styro"], **RESULT_KWARG)
+        _app(["uninstall", "styro"])
     assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
@@ -27,29 +29,26 @@ def test_styro() -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_install(tmp_path: Path) -> None:
-    app(["uninstall", "reagency"], **RESULT_KWARG)
+    _app(["uninstall", "reagency"])
 
-    app(["install", "reagency"], **RESULT_KWARG)
+    _app(["install", "reagency"])
 
-    app(["freeze"], **RESULT_KWARG)
+    _app(["freeze"])
 
     run(
         ["git", "clone", "https://github.com/gerlero/reagency.git"],
         cwd=tmp_path,
         check=True,
     )
-    app(["install", str(tmp_path / "reagency")], **RESULT_KWARG)
+    _app(["install", str(tmp_path / "reagency")])
 
-    app(["freeze"], **RESULT_KWARG)
+    _app(["freeze"])
 
-    app(
-        ["install", "https://github.com/gerlero/reagency.git"],
-        **RESULT_KWARG,
-    )
-    app(["freeze"], **RESULT_KWARG)
+    _app(["install", "https://github.com/gerlero/reagency.git"])
+    _app(["freeze"])
 
-    app(["uninstall", "reagency"], **RESULT_KWARG)
-    app(["freeze"], **RESULT_KWARG)
+    _app(["uninstall", "reagency"])
+    _app(["freeze"])
 
 
 @pytest.mark.skipif(
@@ -57,14 +56,14 @@ def test_install(tmp_path: Path) -> None:
     reason="requires OpenFOAM v2112 or later",
 )
 def test_package_with_dependencies() -> None:
-    app(["uninstall", "porousmicrotransport", "reaagency"], **RESULT_KWARG)
+    _app(["uninstall", "porousmicrotransport", "reaagency"])
 
-    app(["install", "porousmicrotransport"], **RESULT_KWARG)
+    _app(["install", "porousmicrotransport"])
 
-    app(["freeze"], **RESULT_KWARG)
+    _app(["freeze"])
     with pytest.raises(SystemExit) as e:
-        app(["uninstall", "reagency"])
+        _app(["uninstall", "reagency"])
     assert isinstance(e.value, SystemExit)
     assert e.value.code != 0
 
-    app(["uninstall", "reagency", "porousmicrotransport"], **RESULT_KWARG)
+    _app(["uninstall", "reagency", "porousmicrotransport"])
