@@ -1,16 +1,16 @@
 import os
-import sys
 from pathlib import Path
 from subprocess import run
 
+import cyclopts
 import pytest
 
 from styro.__main__ import app
 
-if sys.version_info >= (3, 10):
-    RESULT_KWARG = {"result_action": "return_value"}
-else:
+if cyclopts.__version__.startswith("3."):
     RESULT_KWARG = {}
+else:
+    RESULT_KWARG = {"result_action": "return_value"}
 
 
 def test_styro() -> None:
