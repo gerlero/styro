@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import sys
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from urllib.parse import unquote, urlparse
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -15,13 +20,14 @@ R = TypeVar("R")
 S = TypeVar("S")
 
 
-class _ReentrantContextManager(Generic[R]):
+class _ReentrantContextManager(AbstractContextManager[R]):
     def __init__(self, func: Callable[[], Generator[R, None, None]]) -> None:
         self._func = func
         self._lock_depth = 0
         self._gen: Generator[R, None, None] | None = None
         self._value: R | None = None
 
+    @override
     def __enter__(self) -> R:
         if self._lock_depth == 0:
             self._gen = self._func()
@@ -29,6 +35,7 @@ class _ReentrantContextManager(Generic[R]):
         self._lock_depth += 1
         return cast("R", self._value)
 
+    @override
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from contextlib import AbstractContextManager
 from io import TextIOBase
 from typing import TYPE_CHECKING, ClassVar, TextIO
 
@@ -10,6 +11,11 @@ if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -19,6 +25,7 @@ class _StreamWrapper(TextIOBase):
     def __init__(self, stream: TextIO, /) -> None:
         self._wrapped = stream
 
+    @override
     def write(self, data: str, /) -> int:
         Status.clear()
         ret = self._wrapped.write(data)
@@ -26,6 +33,7 @@ class _StreamWrapper(TextIOBase):
         Status.display()
         return ret
 
+    @override
     def flush(self) -> None:
         self._wrapped.flush()
 
@@ -35,7 +43,7 @@ sys.stdout = _StreamWrapper(sys.stdout)
 sys.stderr = _StreamWrapper(sys.stderr)
 
 
-class Status:
+class Status(AbstractContextManager["Status"]):
     _statuses: ClassVar[list[Status]] = []
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
@@ -80,6 +88,7 @@ class Status:
         self.msg = msg
         Status.display()
 
+    @override
     def __enter__(self) -> Self:
         Status._statuses.append(self)
         if len(Status._statuses) == 1:
@@ -87,6 +96,7 @@ class Status:
         Status.display()
         return self
 
+    @override
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
