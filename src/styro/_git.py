@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from typing import TYPE_CHECKING
+
+import aioshutil
 
 from styro._subprocess import run
 
@@ -22,7 +23,7 @@ async def _git(
             cwd=cwd,
         )
     except FileNotFoundError:
-        if shutil.which("git") is None:
+        if (await aioshutil.which("git")) is None:
             print(
                 "🛑 Error: Git not found. styro needs Git to download packages.",
                 file=sys.stderr,
@@ -66,7 +67,7 @@ async def fetch(repo: Path, url: str, *, missing_ok: bool = True) -> str | None:
             )
         ).stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
-        shutil.rmtree(repo, ignore_errors=True)
+        await aioshutil.rmtree(repo, ignore_errors=True)
         if missing_ok:
             return None
         return await clone(repo, url)
@@ -84,7 +85,7 @@ async def clone(repo: Path, url: str) -> str:
             cwd=repo,
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
-        shutil.rmtree(repo, ignore_errors=True)
+        await aioshutil.rmtree(repo, ignore_errors=True)
         repo.mkdir(parents=True)
         await _git(
             ["clone", url, "."],
