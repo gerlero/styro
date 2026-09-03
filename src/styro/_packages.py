@@ -8,7 +8,6 @@ import fcntl
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from copy import deepcopy
@@ -17,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import aiohttp
+import aioshutil
 
 from styro._git import clone, fetch
 from styro._openfoam import get_changed_binaries, openfoam_version, platform_path
@@ -658,10 +658,7 @@ class Package:
                         path.unlink()
 
                 if not _keep_pkg:
-                    shutil.rmtree(
-                        self._pkg_path,
-                        ignore_errors=True,
-                    )
+                    await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
 
                 with contextlib.suppress(KeyError):
                     del installed["packages"][self.name]
@@ -794,13 +791,9 @@ class _LocalPackage(Package):
     async def download(self) -> None:
         assert self._metadata is not None
         assert isinstance(self.origin, Path)
-        shutil.rmtree(self._pkg_path, ignore_errors=True)
+        await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
         self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(
-            self.origin,
-            self._pkg_path,
-            symlinks=True,
-        )
+        await aioshutil.copytree(self.origin, self._pkg_path, symlinks=True)
 
     def __str__(self) -> str:
         assert isinstance(self.origin, Path)
