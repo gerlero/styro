@@ -716,6 +716,8 @@ class _IndexedPackage(Package):
 
 
 class _GitPackage(Package):
+    origin: str
+
     def __init__(self, package: str) -> None:
         name, origin = Package.parse_package(package)
 
@@ -734,7 +736,6 @@ class _GitPackage(Package):
 
     async def fetch(self) -> None:
         with Status(f"⏬ Downloading {self}"):
-            assert isinstance(self.origin, str)
             new_sha = await fetch(self._pkg_path, self.origin, missing_ok=False)
         assert new_sha is not None
         branch = (
@@ -753,7 +754,6 @@ class _GitPackage(Package):
         self._upgrade_available = new_sha != self.installed_sha()
 
     async def download(self) -> str:
-        assert isinstance(self.origin, str)
         return await clone(self._pkg_path, self.origin)
 
     def __str__(self) -> str:
@@ -761,6 +761,8 @@ class _GitPackage(Package):
 
 
 class _LocalPackage(Package):
+    origin: Path
+
     def __init__(self, package: str) -> None:
         name, origin = Package.parse_package(package)
 
@@ -782,7 +784,6 @@ class _LocalPackage(Package):
 
     async def fetch(self) -> None:
         try:
-            assert isinstance(self.origin, Path)
             self._metadata = json.loads((self.origin / "metadata.json").read_text())
         except FileNotFoundError:
             self._metadata = {}
@@ -790,13 +791,11 @@ class _LocalPackage(Package):
 
     async def download(self) -> None:
         assert self._metadata is not None
-        assert isinstance(self.origin, Path)
         await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
         self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
         await aioshutil.copytree(self.origin, self._pkg_path, symlinks=True)
 
     def __str__(self) -> str:
-        assert isinstance(self.origin, Path)
         return f"{self.name} @ {self.origin.as_uri()}"
 
 
