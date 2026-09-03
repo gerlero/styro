@@ -33,13 +33,7 @@ def platform_path() -> Path:
 
 
 def openfoam_version() -> int:
-    openfoam_version_str = os.environ["WM_PROJECT_VERSION"]
-    if openfoam_version_str.startswith("v"):
-        openfoam_version = int(openfoam_version_str[1:])
-    else:
-        openfoam_version = int(openfoam_version_str)
-
-    return openfoam_version
+    return int(os.environ["WM_PROJECT_VERSION"].removeprefix("v"))
 
 
 @contextmanager
