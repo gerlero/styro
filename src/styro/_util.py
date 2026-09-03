@@ -4,7 +4,7 @@ import sys
 from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 from urllib.parse import unquote, urlparse
 
 if sys.version_info >= (3, 12):
@@ -25,7 +25,7 @@ class _ReentrantContextManager(AbstractContextManager[R]):
         self._func = func
         self._lock_depth = 0
         self._gen: Generator[R, None, None] | None = None
-        self._value: R | None = None
+        self._value: R
 
     @override
     def __enter__(self) -> R:
@@ -33,7 +33,7 @@ class _ReentrantContextManager(AbstractContextManager[R]):
             self._gen = self._func()
             self._value = next(self._gen)
         self._lock_depth += 1
-        return cast("R", self._value)
+        return self._value
 
     @override
     def __exit__(
@@ -50,7 +50,7 @@ class _ReentrantContextManager(AbstractContextManager[R]):
             except StopIteration:
                 self._gen.close()
                 self._gen = None
-                self._value = None
+                del self._value
             else:
                 msg = "Generator did not terminate properly"
                 raise RuntimeError(msg)
