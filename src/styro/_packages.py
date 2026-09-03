@@ -799,6 +799,7 @@ class _LocalPackage(Package):
         shutil.copytree(
             self.origin,
             self._pkg_path,
+            symlinks=True,
         )
 
     def __str__(self) -> str:
