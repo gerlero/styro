@@ -45,8 +45,16 @@ jobs:
         os: [ubuntu-22.04]
         openfoam-version: [9, 14, 2006, 2606]
         python-version: ['3.9', '3.15']
-        dependency-resolution: [highest, lowest-direct]
+        dependency-resolution: [highest]
         include:
+          - os: ubuntu-22.04
+            openfoam-version: 9
+            python-version: '3.9'
+            dependency-resolution: lowest-direct
+          - os: ubuntu-22.04
+            openfoam-version: 2006
+            python-version: '3.9'
+            dependency-resolution: lowest-direct
           - os: macos-latest
             openfoam-version: 2112
             python-version: '3.9'
