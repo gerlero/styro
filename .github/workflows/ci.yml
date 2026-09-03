@@ -44,7 +44,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         openfoam-version: [9, 14, 2006, 2606]
-        python-version: ['3.9', '3.14']
+        python-version: ['3.9', '3.15']
         dependency-resolution: [highest, lowest-direct]
         include:
           - os: macos-latest
@@ -53,7 +53,7 @@ jobs:
             dependency-resolution: lowest-direct
           - os: macos-latest
             openfoam-version: 2112
-            python-version: '3.14'
+            python-version: '3.15'
             dependency-resolution: highest
           - os: macos-latest
             openfoam-version: 2606
@@ -61,7 +61,7 @@ jobs:
             dependency-resolution: lowest-direct
           - os: macos-latest
             openfoam-version: 2606
-            python-version: '3.14'
+            python-version: '3.15'
             dependency-resolution: highest
       fail-fast: false
     steps:
@@ -73,6 +73,7 @@ jobs:
       uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
     - name: Set up OpenFOAM
       uses: gerlero/setup-openfoam@v1
       with:
