@@ -27,7 +27,7 @@ S = TypeVar("S")
 
 
 class _ReentrantContextManager(AbstractContextManager[R]):
-    def __init__(self, func: Callable[[], Generator[R, None, None]]) -> None:
+    def __init__(self, func: Callable[[], Generator[R, None, None]], /) -> None:
         self._func = func
         self._lock_depth = 0
         self._gen: Generator[R, None, None] | None = None
@@ -47,6 +47,7 @@ class _ReentrantContextManager(AbstractContextManager[R]):
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
+        /,
     ) -> None:
         self._lock_depth -= 1
         if self._lock_depth == 0:
@@ -72,6 +73,7 @@ class _ReentrantContextManager(AbstractContextManager[R]):
 
 def reentrantcontextmanager(
     func: Callable[P, Generator[R, None, None]],
+    /,
 ) -> Callable[P, _ReentrantContextManager[R]]:
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> _ReentrantContextManager[R]:
