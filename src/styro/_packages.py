@@ -15,6 +15,11 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
+
 import aiohttp
 import aioshutil
 
@@ -281,6 +286,7 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
+    @override
     def __new__(cls, package: str) -> Package:  # noqa: PYI034
         if cls is not Package:
             return super().__new__(cls)
@@ -667,19 +673,23 @@ class Package:
 
         print(f"🗑️ Package '{self.name}' uninstalled successfully.")
 
+    @override
     def __str__(self) -> str:
         return self.name
 
+    @override
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Package):
             return NotImplemented
         return self.name == other.name and self.origin == other.origin
 
+    @override
     def __hash__(self) -> int:
         return hash((self.name, self.origin))
 
 
 class _IndexedPackage(Package):
+    @override
     async def fetch(self) -> None:
         with Status(f"🔍 Fetching {self}"):
             try:
@@ -718,6 +728,7 @@ class _IndexedPackage(Package):
 class _GitPackage(Package):
     origin: str
 
+    @override
     def __init__(self, package: str) -> None:
         name, origin = Package.parse_package(package)
 
@@ -734,6 +745,7 @@ class _GitPackage(Package):
         super().__init__(name)
         self.origin = origin
 
+    @override
     async def fetch(self) -> None:
         with Status(f"⏬ Downloading {self}"):
             new_sha = await fetch(self._pkg_path, self.origin, missing_ok=False)
@@ -753,9 +765,11 @@ class _GitPackage(Package):
             await run(["git", "checkout", branch], cwd=self._pkg_path)
         self._upgrade_available = new_sha != self.installed_sha()
 
+    @override
     async def download(self) -> str:
         return await clone(self._pkg_path, self.origin)
 
+    @override
     def __str__(self) -> str:
         return f"{self.name} @ {self.origin}"
 
@@ -763,6 +777,7 @@ class _GitPackage(Package):
 class _LocalPackage(Package):
     origin: Path
 
+    @override
     def __init__(self, package: str) -> None:
         name, origin = Package.parse_package(package)
 
@@ -782,6 +797,7 @@ class _LocalPackage(Package):
         super().__init__(name)
         self.origin = path
 
+    @override
     async def fetch(self) -> None:
         try:
             self._metadata = json.loads((self.origin / "metadata.json").read_text())
@@ -789,24 +805,29 @@ class _LocalPackage(Package):
             self._metadata = {}
         self._upgrade_available = True
 
+    @override
     async def download(self) -> None:
         assert self._metadata is not None
         await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
         self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
         await aioshutil.copytree(self.origin, self._pkg_path, symlinks=True)
 
+    @override
     def __str__(self) -> str:
         return f"{self.name} @ {self.origin.as_uri()}"
 
 
 class _Styro(Package):
+    @override
     def __init__(self, package: str) -> None:
         assert package.lower() == "styro"
         super().__init__("styro")
 
+    @override
     def is_installed(self) -> bool:
         return True
 
+    @override
     async def resolve(
         self,
         *,
@@ -832,6 +853,7 @@ class _Styro(Package):
 
         return {self}
 
+    @override
     async def install(
         self,
         *,
@@ -865,6 +887,7 @@ class _Styro(Package):
 
         print("✅ Package 'styro' upgraded successfully.")
 
+    @override
     async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
         print(
             "🛑 Error: styro cannot be uninstalled this way.",
