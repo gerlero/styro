@@ -74,7 +74,7 @@ def reentrantcontextmanager(
     func: Callable[P, Generator[R, None, None]],
 ) -> Callable[P, _ReentrantContextManager[R]]:
     @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> _ReentrantContextManager:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> _ReentrantContextManager[R]:
         return _ReentrantContextManager(lambda: func(*args, **kwargs))
 
     return wrapper
