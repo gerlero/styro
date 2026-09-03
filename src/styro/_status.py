@@ -102,6 +102,7 @@ class Status(AbstractContextManager["Status"]):
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
+        /,
     ) -> None:
         Status._statuses.remove(self)
         if not Status._statuses:
