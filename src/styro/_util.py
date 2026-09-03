@@ -4,8 +4,13 @@ import sys
 from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import unquote, urlparse
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -16,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from types import TracebackType
 
+P = ParamSpec("P")
 R = TypeVar("R")
 S = TypeVar("S")
 
@@ -55,9 +61,9 @@ class _ReentrantContextManager(AbstractContextManager[R]):
                 msg = "Generator did not terminate properly"
                 raise RuntimeError(msg)
 
-    def __call__(self, func: Callable[..., S]) -> Callable[..., S]:
+    def __call__(self, func: Callable[P, S]) -> Callable[P, S]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> S:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> S:
             with self:
                 return func(*args, **kwargs)
 
@@ -65,10 +71,10 @@ class _ReentrantContextManager(AbstractContextManager[R]):
 
 
 def reentrantcontextmanager(
-    func: Callable[..., Generator[R, None, None]],
-) -> Callable[..., _ReentrantContextManager[R]]:
+    func: Callable[P, Generator[R, None, None]],
+) -> Callable[P, _ReentrantContextManager[R]]:
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> _ReentrantContextManager:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> _ReentrantContextManager[R]:
         return _ReentrantContextManager(lambda: func(*args, **kwargs))
 
     return wrapper
