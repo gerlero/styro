@@ -10,7 +10,7 @@ from styro._self import check_for_new_version
 
 
 async def _version_callback() -> str:
-    await check_for_new_version(verbose=True)
+    await check_for_new_version(verbose=True, timeout=3)
     return f"styro {__version__}"
 
 
@@ -21,7 +21,7 @@ app = cyclopts.App(help=__doc__, version=_version_callback)
 async def install(packages: set[Package], /, *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages."""
     if not upgrade or Package("styro") not in packages:
-        await check_for_new_version(verbose=True)
+        await check_for_new_version(verbose=True, timeout=3)
 
     await Package.install_all(packages, upgrade=upgrade)
 
