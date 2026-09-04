@@ -46,10 +46,8 @@
 
 ## 📋 Requirements
 
-Before using **styro**, ensure you have:
+**styro** works with OpenFOAM (from either [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org)).
 
-- **OpenFOAM** (from [openfoam.com](https://www.openfoam.com) or [openfoam.org](https://www.openfoam.org))
-- **Git**
 
 ## ⏬ Installation
 
