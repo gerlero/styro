@@ -323,7 +323,7 @@ class Package:
         self._metadata: dict[str, Any] | None = None
         self._upgrade_available = False
 
-    def _build_steps(self) -> list[str]:
+    def __build_steps(self) -> list[str]:
         assert self._metadata is not None
 
         build = self._metadata.get("build", "wmake")
@@ -339,7 +339,7 @@ class Package:
 
         return build
 
-    def _check_compatibility(self) -> None:
+    def __check_compatibility(self) -> None:
         assert self._metadata is not None
 
         distro_compatible = False
@@ -416,8 +416,8 @@ class Package:
         if self._metadata is None:
             await self.fetch()
             assert self._metadata is not None
-            self._check_compatibility()
-            self._build_steps()
+            self.__check_compatibility()
+            self.__build_steps()
 
         if (
             self.installed_sha() is not None
@@ -517,7 +517,7 @@ class Package:
             if self._metadata is None:
                 await self.fetch()
                 assert self._metadata is not None
-                self._check_compatibility()
+                self.__check_compatibility()
 
             if (
                 self.is_installed()
@@ -557,7 +557,7 @@ class Package:
 
                     try:
                         with get_changed_binaries() as installed_binaries:
-                            for cmd in self._build_steps():
+                            for cmd in self.__build_steps():
                                 await run(
                                     ["/bin/bash", "-c", cmd],
                                     cwd=self._pkg_path,
