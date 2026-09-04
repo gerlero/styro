@@ -10,7 +10,7 @@ from styro._self import check_for_new_version
 
 
 async def _version_callback() -> str:
-    await check_for_new_version(verbose=True)
+    await check_for_new_version(verbose=True, timeout=3)
     return f"styro {__version__}"
 
 
@@ -23,7 +23,7 @@ async def install(packages: list[str], /, *, upgrade: bool = False) -> None:
     pkgs = {Package(pkg) for pkg in packages}
 
     if not upgrade or Package("styro") not in pkgs:
-        await check_for_new_version(verbose=True)
+        await check_for_new_version(verbose=True, timeout=3)
 
     await Package.install_all(pkgs, upgrade=upgrade)
 
