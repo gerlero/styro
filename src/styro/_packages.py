@@ -83,7 +83,7 @@ class Package:
     )
 
     @staticmethod
-    def _check_for_duplicate_names(pkgs: set[Package]) -> None:
+    def __check_for_duplicate_names(pkgs: set[Package], /) -> None:
         duplicate_names = {
             pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
         }
@@ -95,7 +95,7 @@ class Package:
             sys.exit(1)
 
     @staticmethod
-    def all_installed_binaries() -> set[Path]:
+    def __all_installed_binaries() -> set[Path]:
         with lock as installed:
             return {
                 Path(platform_path() / "bin" / app)
@@ -110,8 +110,8 @@ class Package:
             )
 
     @staticmethod
-    def parse_package(
-        package: str,
+    def _parse_package_str(
+        package: str, /
     ) -> tuple[str, None] | tuple[None, str] | tuple[str, str]:
         name = package.lower().replace("_", "-")
         if Package.__name_regex.fullmatch(name):
@@ -135,7 +135,7 @@ class Package:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
-    async def _detect_cycles(pkgs: set[Package], *, upgrade: bool = False) -> None:
+    async def _detect_cycles(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
         """
         Detect cycles in the dependency graph before installation.
 
@@ -157,6 +157,7 @@ class Package:
 
         async def visit(
             pkg: Package,
+            /,
             *,
             pkg_upgrade: bool = False,
             pkg_force_reinstall: bool = False,
@@ -229,10 +230,11 @@ class Package:
     @lock
     async def resolve_all(
         pkgs: set[Package],
+        /,
         *,
         upgrade: bool = False,
     ) -> set[Package]:
-        Package._check_for_duplicate_names(pkgs)
+        Package.__check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
         await Package._detect_cycles(pkgs, upgrade=upgrade)
@@ -248,7 +250,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def install_all(pkgs: set[Package], *, upgrade: bool = False) -> None:
+    async def install_all(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
             for pkg in await Package.resolve_all(pkgs, upgrade=upgrade)
@@ -256,7 +258,7 @@ class Package:
 
         not_to_install = pkgs.difference(to_install)
 
-        Package._check_for_duplicate_names(set(to_install).union(not_to_install))
+        Package.__check_for_duplicate_names(set(to_install).union(not_to_install))
 
         await asyncio.gather(
             *(pkg.install(upgrade=upgrade, _deps=False) for pkg in not_to_install),
@@ -268,7 +270,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def uninstall_all(pkgs: set[Package]) -> None:
+    async def uninstall_all(pkgs: set[Package], /) -> None:
         dependents = set()
         for pkg in pkgs:
             dependents.update(pkg.installed_dependents())
@@ -284,12 +286,11 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
-    @override
-    def __new__(cls, package: str) -> Package:  # noqa: PYI034
+    def __new__(cls, package: str, /) -> Package:  # noqa: PYI034
         if cls is not Package:
             return super().__new__(cls)
 
-        name, origin = Package.parse_package(package)
+        name, origin = Package._parse_package_str(package)
 
         with lock as installed:
             if name is not None and origin is None:
@@ -570,7 +571,7 @@ class Package:
                         )
                         sys.exit(1)
                     finally:
-                        all_installed_binaries = self.all_installed_binaries()
+                        all_installed_binaries = self.__all_installed_binaries()
                         for path in list(installed_binaries):
                             if path in all_installed_binaries:
                                 print(
@@ -676,7 +677,7 @@ class Package:
         return self.name
 
     @override
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: object, /) -> bool:
         if not isinstance(other, Package):
             return NotImplemented
         return self.name == other.name and self.origin == other.origin
@@ -726,9 +727,8 @@ class _IndexedPackage(Package):
 class _GitPackage(Package):
     origin: str
 
-    @override
-    def __init__(self, package: str) -> None:
-        name, origin = Package.parse_package(package)
+    def __init__(self, package: str, /) -> None:
+        name, origin = Package._parse_package_str(package)
 
         if origin is None:
             assert name is not None
@@ -775,9 +775,8 @@ class _GitPackage(Package):
 class _LocalPackage(Package):
     origin: Path
 
-    @override
-    def __init__(self, package: str) -> None:
-        name, origin = Package.parse_package(package)
+    def __init__(self, package: str, /) -> None:
+        name, origin = Package._parse_package_str(package)
 
         if origin is None:
             assert name is not None
@@ -816,8 +815,7 @@ class _LocalPackage(Package):
 
 
 class _Styro(Package):
-    @override
-    def __init__(self, package: str) -> None:
+    def __init__(self, package: str = "styro", /) -> None:
         assert package.lower() == "styro"
         super().__init__("styro")
 
