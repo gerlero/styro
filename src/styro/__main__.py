@@ -18,22 +18,18 @@ app = cyclopts.App(help=__doc__, version=_version_callback)
 
 
 @app.command
-async def install(packages: list[str], /, *, upgrade: bool = False) -> None:
+async def install(packages: set[Package], /, *, upgrade: bool = False) -> None:
     """Install OpenFOAM packages."""
-    pkgs = {Package(pkg) for pkg in packages}
-
-    if not upgrade or Package("styro") not in pkgs:
+    if not upgrade or Package("styro") not in packages:
         await check_for_new_version(verbose=True)
 
-    await Package.install_all(pkgs, upgrade=upgrade)
+    await Package.install_all(packages, upgrade=upgrade)
 
 
 @app.command
-async def uninstall(packages: list[str], /) -> None:
+async def uninstall(packages: set[Package], /) -> None:
     """Uninstall OpenFOAM packages."""
-    pkgs = {Package(pkg) for pkg in packages}
-
-    await Package.uninstall_all(pkgs)
+    await Package.uninstall_all(packages)
 
 
 @app.command
