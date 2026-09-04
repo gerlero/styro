@@ -45,10 +45,16 @@ Repository = "https://github.com/gerlero/styro"
 styro = "styro.__main__:app"
 
 [dependency-groups]
-dev = [
-    "pyinstaller>=5,<7",
+lint = ["ruff>=0.16.5,<0.17"]
+typing = ["ty>=0.0.76,<0.1"]
+test = [
     "pytest>=8,<10",
     "pytest-cov>=7,<8",
-    "ruff>=0.16.5,<0.17",
-    "ty>=0.0.76,<0.1",
+]
+binary = ["pyinstaller>=5,<7"]
+dev = [
+    {include-group = "lint"},
+    {include-group = "typing"},
+    {include-group = "test"},
+    {include-group = "binary"},
 ]

@@ -36,7 +36,7 @@ jobs:
       with:
         python-version-file: pyproject.toml
     - name: Check types with ty
-      run: uv run ty check
+      run: uv run --group typing ty check
 
   test:
     runs-on: ${{ matrix.os }}
@@ -90,6 +90,7 @@ jobs:
       run: >
         uv run
         --python ${{ matrix.python-version }}
+        --group test
         --resolution ${{ matrix.dependency-resolution }}
         pytest --cov=styro --cov-report xml
     - name: Upload code coverage results to Codecov
