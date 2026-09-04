@@ -305,7 +305,7 @@ class Package:
                 return super().__new__(_Styro)
             return super().__new__(_IndexedPackage)
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, /) -> None:
         if not Package.__name_regex.fullmatch(name):
             print(
                 f"🛑 Error: Invalid package name: {name}",
