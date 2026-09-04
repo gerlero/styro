@@ -738,7 +738,7 @@ class _GitPackage(Package):
         assert origin.startswith(("http://", "https://"))
 
         if name is None:
-            name = origin.rsplit("/", 1)[-1].split(".", 1)[0]
+            name = origin.rsplit("/", 1)[-1].split(".", 1)[0].lower().replace("_", "-")
 
         super().__init__(name)
         self.origin = origin
