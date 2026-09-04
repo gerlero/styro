@@ -114,13 +114,13 @@ class Package:
         package: str,
     ) -> tuple[str, None] | tuple[None, str] | tuple[str, str]:
         name = package.lower().replace("_", "-")
-        if Package.__name_regex.match(name):
+        if Package.__name_regex.fullmatch(name):
             return name, None
         if "@" in package:
             name, origin = package.split("@", 1)
             name = name.rstrip().lower().replace("_", "-")
             origin = origin.lstrip()
-            if Package.__name_regex.match(name):
+            if Package.__name_regex.fullmatch(name):
                 return name, origin
             print(
                 f"🛑 Error: Invalid package name: {name}",
@@ -305,7 +305,7 @@ class Package:
             return super().__new__(_IndexedPackage)
 
     def __init__(self, name: str) -> None:
-        if not Package.__name_regex.match(name):
+        if not Package.__name_regex.fullmatch(name):
             print(
                 f"🛑 Error: Invalid package name: {name}",
                 file=sys.stderr,
