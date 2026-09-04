@@ -21,7 +21,7 @@ else:
 import aiohttp
 import aioshutil
 
-from styro._git import clone, fetch
+from styro._git import clone, fetch, read_text
 from styro._openfoam import get_changed_binaries, openfoam_version, platform_path
 from styro._self import (
     check_for_new_version,
@@ -321,6 +321,7 @@ class Package:
         self.name = name
         self.origin: str | Path | None = None
         self._metadata: dict[str, Any] | None = None
+        self._fetched_sha: str | None = None
         self._upgrade_available = False
 
     def __build_steps(self) -> list[str]:
@@ -708,12 +709,13 @@ class _IndexedPackage(Package):
 
         assert self._metadata is not None
 
-        new_sha = await fetch(self._pkg_path, self._metadata["repo"])
-        if new_sha is None:
+        self._fetched_sha = await fetch(self._pkg_path, self._metadata["repo"])
+        if self._fetched_sha is None:
             self._upgrade_available = True
         else:
-            self._upgrade_available = new_sha != self.installed_sha()
+            self._upgrade_available = self._fetched_sha != self.installed_sha()
 
+    @override
     async def download(self) -> str:
         assert self._metadata is not None
         if self.is_installed():
@@ -721,7 +723,11 @@ class _IndexedPackage(Package):
         else:
             title = f"⏬ Downloading {self.name}"
         with Status(title):
-            return await clone(self._pkg_path, self._metadata["repo"])
+            return await clone(
+                self._pkg_path,
+                self._metadata["repo"],
+                revision=self._fetched_sha,
+            )
 
 
 class _GitPackage(Package):
@@ -746,26 +752,29 @@ class _GitPackage(Package):
     @override
     async def fetch(self) -> None:
         with Status(f"⏬ Downloading {self}"):
-            new_sha = await fetch(self._pkg_path, self.origin, missing_ok=False)
-        assert new_sha is not None
-        branch = (
-            await run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=self._pkg_path,
+            self._fetched_sha = await fetch(
+                self._pkg_path,
+                self.origin,
+                missing_ok=False,
             )
-        ).stdout.strip()
-        await run(["git", "checkout", new_sha], cwd=self._pkg_path)
-        try:
-            self._metadata = json.loads((self._pkg_path / "metadata.json").read_text())
-        except FileNotFoundError:
-            self._metadata = {}
-        finally:
-            await run(["git", "checkout", branch], cwd=self._pkg_path)
-        self._upgrade_available = new_sha != self.installed_sha()
+            assert self._fetched_sha is not None
+
+            metadata = read_text(
+                self._pkg_path,
+                "metadata.json",
+                revision=self._fetched_sha,
+            )
+            self._metadata = {} if metadata is None else json.loads(metadata)
+
+            self._upgrade_available = self._fetched_sha != self.installed_sha()
 
     @override
     async def download(self) -> str:
-        return await clone(self._pkg_path, self.origin)
+        return await clone(
+            self._pkg_path,
+            self.origin,
+            revision=self._fetched_sha,
+        )
 
     @override
     def __str__(self) -> str:
