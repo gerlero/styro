@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
-from subprocess import run
 
 import cyclopts
 import pytest
+from dulwich import porcelain
 
 from styro.__main__ import app
 
@@ -35,10 +35,9 @@ def test_install(tmp_path: Path) -> None:
 
     _app(["freeze"])
 
-    run(
-        ["git", "clone", "https://github.com/gerlero/reagency.git"],
-        cwd=tmp_path,
-        check=True,
+    porcelain.clone(
+        "https://github.com/gerlero/reagency.git",
+        tmp_path / "reagency",
     )
     _app(["install", str(tmp_path / "reagency")])
 

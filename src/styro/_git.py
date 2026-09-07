@@ -1,100 +1,104 @@
 from __future__ import annotations
 
-import subprocess
-import sys
+import asyncio
+import os
+import shutil
 from typing import TYPE_CHECKING
 
-import aioshutil
-
-from styro._subprocess import run
+from dulwich import porcelain
+from dulwich.errors import NotGitRepository
+from dulwich.objects import Blob
+from dulwich.refs import HEADREF
+from dulwich.repo import Repo
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-async def _git(
-    args: list[str],
-    *,
-    cwd: Path,
-) -> subprocess.CompletedProcess[str]:
+def _set_remote_url(repo: Repo, url: str) -> None:
+    config = repo.get_config()
+    config.set((b"remote", b"origin"), b"url", url.encode())
+    config.write_to_path()
+
+
+def _fetch_existing(repo: Repo, url: str) -> str:
+    _set_remote_url(repo, url)
+    with open(os.devnull, "wb") as devnull:
+        result = porcelain.fetch(repo, "origin", errstream=devnull, quiet=True)
+
+    head = result.refs[HEADREF]
+    assert head is not None
+    return head.decode("ascii")
+
+
+def _fresh_clone(path: Path, url: str, revision: str | None = None) -> str:
+    shutil.rmtree(path, ignore_errors=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        return await run(
-            ["git", *args],
-            cwd=cwd,
-        )
-    except FileNotFoundError:
-        if (await aioshutil.which("git")) is None:
-            print(
-                "🛑 Error: Git not found. styro needs Git to download packages.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        with open(os.devnull, "wb") as devnull:
+            repo = porcelain.clone(url, path, errstream=devnull)
+
+        if revision is None:
+            return repo.head().decode("ascii")
+
+        porcelain.reset(repo, "hard", revision)
+        return revision
+    except Exception:
+        shutil.rmtree(path, ignore_errors=True)
         raise
 
 
-async def _get_default_branch(repo: Path) -> str:
-    return (
-        (
-            await _git(
-                ["rev-parse", "--abbrev-ref", "origin/HEAD"],
-                cwd=repo,
-            )
-        )
-        .stdout.strip()
-        .split("/", maxsplit=1)[-1]
-    )
-
-
-async def _set_remote_url(repo: Path, url: str) -> None:
-    await _git(
-        ["remote", "set-url", "origin", url],
-        cwd=repo,
-    )
-
-
-async def fetch(repo: Path, url: str, *, missing_ok: bool = True) -> str | None:
+def _fetch(path: Path, url: str, *, missing_ok: bool = True) -> str | None:
     try:
-        await _set_remote_url(repo, url)
-        branch = await _get_default_branch(repo)
-        await _git(
-            ["fetch", "origin"],
-            cwd=repo,
-        )
-        return (
-            await _git(
-                ["rev-parse", f"origin/{branch}"],
-                cwd=repo,
-            )
-        ).stdout.strip()
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        await aioshutil.rmtree(repo, ignore_errors=True)
+        repo = Repo(path)
+    except (FileNotFoundError, NotGitRepository):
         if missing_ok:
             return None
-        return await clone(repo, url)
+        return _fresh_clone(path, url)
+
+    return _fetch_existing(repo, url)
 
 
-async def clone(repo: Path, url: str) -> str:
+def _clone(path: Path, url: str, revision: str | None) -> str:
     try:
-        branch = await _get_default_branch(repo)
-        await _git(
-            ["checkout", branch],
-            cwd=repo,
+        repo = Repo(path)
+    except (FileNotFoundError, NotGitRepository):
+        return _fresh_clone(path, url, revision)
+
+    if revision is None:
+        revision = _fetch_existing(repo, url)
+    else:
+        _set_remote_url(repo, url)
+
+    porcelain.reset(repo, "hard", revision)
+    return revision
+
+
+async def fetch(path: Path, url: str, *, missing_ok: bool = True) -> str | None:
+    return await asyncio.to_thread(
+        _fetch,
+        path,
+        url,
+        missing_ok=missing_ok,
+    )
+
+
+async def clone(path: Path, url: str, *, revision: str | None = None) -> str:
+    return await asyncio.to_thread(_clone, path, url, revision)
+
+
+def read_text(path: Path, subpath: str, *, revision: str | None = None) -> str | None:
+    try:
+        obj = porcelain.get_object_by_path(
+            path,
+            subpath,
+            committish=revision,
         )
-        await _git(
-            ["reset", "--hard", f"origin/{branch}"],
-            cwd=repo,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        await aioshutil.rmtree(repo, ignore_errors=True)
-        repo.mkdir(parents=True)
-        await _git(
-            ["clone", url, "."],
-            cwd=repo,
-        )
-        branch = await _get_default_branch(repo)
-    return (
-        await _git(
-            ["rev-parse", branch],
-            cwd=repo,
-        )
-    ).stdout.strip()
+    except KeyError:
+        return None
+
+    if not isinstance(obj, Blob):
+        return None
+
+    return obj.data.decode()

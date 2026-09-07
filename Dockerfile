@@ -5,7 +5,7 @@ ARG VIRTUAL_ENV=/opt/venv
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends \
-    python3-venv git \
+    python3-venv \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m venv ${VIRTUAL_ENV}
 
