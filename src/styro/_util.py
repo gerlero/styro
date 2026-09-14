@@ -5,7 +5,6 @@ from contextlib import AbstractContextManager, contextmanager
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
-from urllib.parse import unquote, urlparse
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -86,7 +85,12 @@ def path_from_uri(uri: str, /) -> Path:
     assert uri.startswith("file://")
     if sys.version_info >= (3, 13):
         return Path.from_uri(uri)
-    return Path(unquote(urlparse(uri).path))
+
+    from urllib.request import url2pathname
+
+    ret = Path(url2pathname(uri[len("file:") :]))
+    assert ret.is_absolute()
+    return ret
 
 
 @contextmanager
