@@ -47,7 +47,7 @@ class Status(AbstractContextManager["Status"]):
     _statuses: ClassVar[list[Status]] = []
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
-    _animation_task: ClassVar[asyncio.Task | None] = None
+    _animation_task: ClassVar[asyncio.Task]
 
     @staticmethod
     def clear() -> None:
@@ -106,8 +106,6 @@ class Status(AbstractContextManager["Status"]):
     ) -> None:
         Status._statuses.remove(self)
         if not Status._statuses:
-            task = Status._animation_task
-            assert task is not None
-            task.cancel()
-            Status._animation_task = None
+            Status._animation_task.cancel()
+            del Status._animation_task
         Status.display()
