@@ -144,12 +144,16 @@ class Styro(Package):
                 sys.exit(1)
 
         with Status("⏳ Upgrading styro"):
+            executable = Path(sys.executable)
+            old_executable = executable.rename(executable.with_suffix(".old"))
             try:
                 with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as tar:
-                    tar.extract("styro", path=Path(sys.executable).parent)
+                    tar.extract("styro", path=executable.parent)
             except Exception as e:  # noqa: BLE001
+                old_executable.rename(executable)
                 print(f"🛑 Error: Failed to upgrade styro: {e}", file=sys.stderr)
                 sys.exit(1)
+            old_executable.unlink()
 
         print("✅ Package 'styro' upgraded successfully.")
 
