@@ -16,7 +16,7 @@ def path_from_uri(uri: str, /) -> Path:
 
     from urllib.request import url2pathname
 
-    ret = Path(url2pathname(uri[len("file:") :]))
+    ret = Path(url2pathname(uri.removeprefix("file:")))
     assert ret.is_absolute()
     return ret
 
