@@ -2,125 +2,166 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import fcntl
-import json
 import os
 import re
 import subprocess
 import sys
-from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-import aiohttp
 import aioshutil
 
-from styro._git import clone, fetch, read_text
 from styro._openfoam import get_changed_binaries, openfoam_version, platform_path
-from styro._self import (
-    check_for_new_version,
-    is_managed_installation,
-    print_upgrade_instruction,
-    selfupgrade,
-)
-from styro._status import Status
-from styro._subprocess import run
-from styro._util import path_from_uri, reentrantcontextmanager
+from styro._packages._lock import lock
+from styro._utils.status import Status
+from styro._utils.subprocess import run
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from styro._packages._self import Styro
 
 
-@reentrantcontextmanager
-def _lock() -> Generator[dict[str, Any], None, None]:
-    installed_path = platform_path() / "styro" / "installed.json"
-
-    installed_path.parent.mkdir(parents=True, exist_ok=True)
-    installed_path.touch(exist_ok=True)
-    with installed_path.open("r+") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-
-        try:
-            f.seek(0)
-            installed = json.load(f)
-        except json.JSONDecodeError:
-            installed = {}
-        else:
-            assert isinstance(installed, dict)
-            if installed.get("version") != 1:
-                print(
-                    "🛑 Error: installed.json file is of a newer version. Please upgrade styro.",
-                    file=sys.stderr,
-                )
-                print_upgrade_instruction()
-                sys.exit(1)
-        installed_copy = deepcopy(installed)
-        try:
-            yield installed
-        finally:
-            if installed:
-                if installed != installed_copy:
-                    f.seek(0)
-                    f.write(json.dumps(installed, indent=2))
-                    f.truncate()
-            else:
-                installed_path.unlink()
+_NAME_REGEX = re.compile(r"^(?!.*--)[a-z0-9]+(-[a-z0-9]+)*$")
+_install_lock = asyncio.Lock()
 
 
-lock = _lock()
+def _check_for_duplicate_names(pkgs: set[Package], /) -> None:
+    duplicate_names = {
+        pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
+    }
+    if duplicate_names:
+        print(
+            f"🛑 Error: duplicate/conflicting package names: {', '.join(duplicate_names)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
-class Package:
-    __install_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
-    __name_regex: ClassVar[re.Pattern] = re.compile(
-        r"^(?!.*--)[a-z0-9]+(-[a-z0-9]+)*$",
-    )
+async def _detect_cycles(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
+    """
+    Detect cycles in the dependency graph before installation.
 
-    @staticmethod
-    def __check_for_duplicate_names(pkgs: set[Package], /) -> None:
-        duplicate_names = {
-            pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
-        }
-        if duplicate_names:
+    Uses depth-first search with three states:
+    - unvisited (white): package not yet visited
+    - visiting (gray): package currently being processed
+    - visited (black): package and all its dependencies processed
+
+    Raises SystemExit if a cycle is detected.
+    """
+
+    class State(Enum):
+        UNVISITED = 0
+        VISITING = 1
+        VISITED = 2
+
+    states: dict[Package, State] = {}
+    path: list[Package] = []
+
+    async def visit(
+        pkg: Package,
+        /,
+        *,
+        pkg_upgrade: bool = False,
+        pkg_force_reinstall: bool = False,
+    ) -> None:
+        if states.get(pkg, State.UNVISITED) == State.VISITED:
+            return
+
+        if states.get(pkg, State.UNVISITED) == State.VISITING:
+            # Found a cycle - construct the cycle path
+            cycle_start_idx = path.index(pkg)
+            cycle = [*path[cycle_start_idx:], pkg]
+            cycle_names = " -> ".join(p.name for p in cycle)
+
             print(
-                f"🛑 Error: duplicate/conflicting package names: {', '.join(duplicate_names)}",
+                f"❌ Dependency cycle detected: {cycle_names}",
                 file=sys.stderr,
             )
             sys.exit(1)
 
-    @staticmethod
-    def __all_installed_binaries() -> set[Path]:
-        with lock as installed:
-            return {
-                Path(platform_path() / "bin" / app)
-                for pkg in installed.get("packages", {}).values()
-                for app in pkg.get("apps", [])
-            }.union(
-                {
-                    Path(platform_path() / "lib" / lib)
-                    for pkg in installed.get("packages", {}).values()
-                    for lib in pkg.get("libs", [])
-                }
-            )
+        states[pkg] = State.VISITING
+        path.append(pkg)
 
+        # Follow the same logic as resolve() method
+        # Early return if package is already installed and no upgrade/force reinstall
+        if (
+            pkg.installed_sha() is not None
+            and not pkg_upgrade
+            and not pkg_force_reinstall
+        ):
+            path.pop()
+            states[pkg] = State.VISITED
+            return
+
+        # Check if we need to fetch metadata to get dependencies
+        if pkg._metadata is None:
+            with contextlib.suppress(Exception):
+                await pkg.fetch()
+
+        # Check again after potential fetch
+        if (
+            pkg._metadata is not None
+            and pkg.installed_sha() is not None
+            and not pkg._upgrade_available
+            and not pkg_force_reinstall
+        ):
+            path.pop()
+            states[pkg] = State.VISITED
+            return
+
+        # Only visit dependencies if the package actually needs resolution
+        # This mirrors the resolve() method logic exactly
+        if pkg._metadata is not None:
+            # Visit requested dependencies (with upgrade=True)
+            for dep in pkg.requested_dependencies():
+                await visit(dep, pkg_upgrade=True, pkg_force_reinstall=False)
+
+            # Visit installed dependents (reverse dependencies) with force_reinstall=True
+            for dependent in pkg.installed_dependents():
+                await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
+
+        path.pop()
+        states[pkg] = State.VISITED
+
+    # Start DFS from all root packages with the provided upgrade setting
+    for pkg in pkgs:
+        if states.get(pkg, State.UNVISITED) == State.UNVISITED:
+            await visit(pkg, pkg_upgrade=upgrade, pkg_force_reinstall=False)
+
+
+def _all_installed_binaries() -> set[Path]:
+    with lock as installed:
+        return {
+            Path(platform_path() / "bin" / app)
+            for pkg in installed.get("packages", {}).values()
+            for app in pkg.get("apps", [])
+        }.union(
+            {
+                Path(platform_path() / "lib" / lib)
+                for pkg in installed.get("packages", {}).values()
+                for lib in pkg.get("libs", [])
+            }
+        )
+
+
+class Package:
     @staticmethod
     def _parse_package_str(
         package: str, /
     ) -> tuple[str, None] | tuple[None, str] | tuple[str, str]:
         name = package.lower().replace("_", "-")
-        if Package.__name_regex.fullmatch(name):
+        if _NAME_REGEX.fullmatch(name):
             return name, None
         if "@" in package:
             name, origin = package.split("@", 1)
             name = name.rstrip().lower().replace("_", "-")
             origin = origin.lstrip()
-            if Package.__name_regex.fullmatch(name):
+            if _NAME_REGEX.fullmatch(name):
                 return name, origin
             print(
                 f"🛑 Error: Invalid package name: {name}",
@@ -135,98 +176,6 @@ class Package:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
-    async def _detect_cycles(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
-        """
-        Detect cycles in the dependency graph before installation.
-
-        Uses depth-first search with three states:
-        - unvisited (white): package not yet visited
-        - visiting (gray): package currently being processed
-        - visited (black): package and all its dependencies processed
-
-        Raises SystemExit if a cycle is detected.
-        """
-
-        class State(Enum):
-            UNVISITED = 0
-            VISITING = 1
-            VISITED = 2
-
-        states: dict[Package, State] = {}
-        path: list[Package] = []
-
-        async def visit(
-            pkg: Package,
-            /,
-            *,
-            pkg_upgrade: bool = False,
-            pkg_force_reinstall: bool = False,
-        ) -> None:
-            if states.get(pkg, State.UNVISITED) == State.VISITED:
-                return
-
-            if states.get(pkg, State.UNVISITED) == State.VISITING:
-                # Found a cycle - construct the cycle path
-                cycle_start_idx = path.index(pkg)
-                cycle = [*path[cycle_start_idx:], pkg]
-                cycle_names = " -> ".join(p.name for p in cycle)
-
-                print(
-                    f"❌ Dependency cycle detected: {cycle_names}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-            states[pkg] = State.VISITING
-            path.append(pkg)
-
-            # Follow the same logic as resolve() method
-            # Early return if package is already installed and no upgrade/force reinstall
-            if (
-                pkg.installed_sha() is not None
-                and not pkg_upgrade
-                and not pkg_force_reinstall
-            ):
-                path.pop()
-                states[pkg] = State.VISITED
-                return
-
-            # Check if we need to fetch metadata to get dependencies
-            if pkg._metadata is None:
-                with contextlib.suppress(Exception):
-                    await pkg.fetch()
-
-            # Check again after potential fetch
-            if (
-                pkg._metadata is not None
-                and pkg.installed_sha() is not None
-                and not pkg._upgrade_available
-                and not pkg_force_reinstall
-            ):
-                path.pop()
-                states[pkg] = State.VISITED
-                return
-
-            # Only visit dependencies if the package actually needs resolution
-            # This mirrors the resolve() method logic exactly
-            if pkg._metadata is not None:
-                # Visit requested dependencies (with upgrade=True)
-                for dep in pkg.requested_dependencies():
-                    await visit(dep, pkg_upgrade=True, pkg_force_reinstall=False)
-
-                # Visit installed dependents (reverse dependencies) with force_reinstall=True
-                for dependent in pkg.installed_dependents():
-                    await visit(dependent, pkg_upgrade=False, pkg_force_reinstall=True)
-
-            path.pop()
-            states[pkg] = State.VISITED
-
-        # Start DFS from all root packages with the provided upgrade setting
-        for pkg in pkgs:
-            if states.get(pkg, State.UNVISITED) == State.UNVISITED:
-                await visit(pkg, pkg_upgrade=upgrade, pkg_force_reinstall=False)
-
-    @staticmethod
     @lock
     async def resolve_all(
         pkgs: set[Package],
@@ -234,10 +183,10 @@ class Package:
         *,
         upgrade: bool = False,
     ) -> set[Package]:
-        Package.__check_for_duplicate_names(pkgs)
+        _check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
-        await Package._detect_cycles(pkgs, upgrade=upgrade)
+        await _detect_cycles(pkgs, upgrade=upgrade)
 
         resolved: set[Package] = set()
         return {
@@ -258,7 +207,7 @@ class Package:
 
         not_to_install = pkgs.difference(to_install)
 
-        Package.__check_for_duplicate_names(set(to_install).union(not_to_install))
+        _check_for_duplicate_names(set(to_install).union(not_to_install))
 
         await asyncio.gather(
             *(pkg.install(upgrade=upgrade, _deps=False) for pkg in not_to_install),
@@ -286,11 +235,22 @@ class Package:
             *(pkg.uninstall(_force=True) for pkg in pkgs),
         )
 
+    @overload
+    def __new__(cls, package: Literal["styro"], /) -> Styro: ...
+
+    @overload
+    def __new__(cls, package: str, /) -> Package: ...
+
     def __new__(cls, package: str, /) -> Package:  # noqa: PYI034
         if cls is not Package:
             return super().__new__(cls)
 
         name, origin = Package._parse_package_str(package)
+
+        from styro._packages._git import GitPackage
+        from styro._packages._indexed import IndexedPackage
+        from styro._packages._local import LocalPackage
+        from styro._packages._self import Styro
 
         with lock as installed:
             if name is not None and origin is None:
@@ -299,20 +259,23 @@ class Package:
 
             if origin is not None:
                 if origin.startswith(("http://", "https://")):
-                    return super().__new__(_GitPackage)
-                return super().__new__(_LocalPackage)
+                    return super().__new__(GitPackage)
+                return super().__new__(LocalPackage)
             if name == "styro":
-                return super().__new__(_Styro)
-            return super().__new__(_IndexedPackage)
+                return super().__new__(Styro)
+            return super().__new__(IndexedPackage)
 
     def __init__(self, name: str, /) -> None:
-        if not Package.__name_regex.fullmatch(name):
+        if not _NAME_REGEX.fullmatch(name):
             print(
                 f"🛑 Error: Invalid package name: {name}",
                 file=sys.stderr,
             )
             sys.exit(1)
-        if name == "styro" and not isinstance(self, _Styro):
+
+        from styro._packages._self import Styro
+
+        if name == "styro" and not isinstance(self, Styro):
             print(
                 "🛑 Error: 'styro' not allowed as a package name.",
                 file=sys.stderr,
@@ -499,6 +462,8 @@ class Package:
         _force_reinstall: bool = False,
         _deps: bool | dict[Package, asyncio.Event] = True,
     ) -> None:
+        from styro._packages._local import LocalPackage
+
         with lock as installed:
             if _deps is True:
                 await self.install_all({self}, upgrade=upgrade)
@@ -506,7 +471,7 @@ class Package:
 
             if (
                 self.is_installed()
-                and not isinstance(self, _LocalPackage)
+                and not isinstance(self, LocalPackage)
                 and not upgrade
                 and not _force_reinstall
             ):
@@ -522,7 +487,7 @@ class Package:
 
             if (
                 self.is_installed()
-                and not isinstance(self, _LocalPackage)
+                and not isinstance(self, LocalPackage)
                 and not self._upgrade_available
                 and not _force_reinstall
             ):
@@ -548,7 +513,7 @@ class Package:
                     )
                 )
 
-            async with self.__install_lock:
+            async with _install_lock:
                 with Status(f"⏳ Installing {self.name}") as status:
                     if self.requested_dependencies():
                         env = os.environ.copy()
@@ -572,7 +537,7 @@ class Package:
                         )
                         sys.exit(1)
                     finally:
-                        all_installed_binaries = self.__all_installed_binaries()
+                        all_installed_binaries = _all_installed_binaries()
                         for path in list(installed_binaries):
                             if path in all_installed_binaries:
                                 print(
@@ -686,228 +651,3 @@ class Package:
     @override
     def __hash__(self) -> int:
         return hash((self.name, self.origin))
-
-
-class _IndexedPackage(Package):
-    @override
-    async def fetch(self) -> None:
-        with Status(f"🔍 Fetching {self}"):
-            try:
-                async with (
-                    aiohttp.ClientSession(raise_for_status=True) as session,
-                    session.get(
-                        f"https://raw.githubusercontent.com/exasim-project/opi/main/pkg/{self.name}/metadata.json"
-                    ) as response,
-                ):
-                    self._metadata = await response.json(content_type="text/plain")
-            except Exception as e:  # noqa: BLE001
-                print(
-                    f"🛑 Error: Failed to fetch package '{self.name}': {e}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-        assert self._metadata is not None
-
-        self._fetched_sha = await fetch(self._pkg_path, self._metadata["repo"])
-        if self._fetched_sha is None:
-            self._upgrade_available = True
-        else:
-            self._upgrade_available = self._fetched_sha != self.installed_sha()
-
-    @override
-    async def download(self) -> str:
-        assert self._metadata is not None
-        if self.is_installed():
-            title = f"⏩ Updating {self.name}"
-        else:
-            title = f"⏬ Downloading {self.name}"
-        with Status(title):
-            return await clone(
-                self._pkg_path,
-                self._metadata["repo"],
-                revision=self._fetched_sha,
-            )
-
-
-class _GitPackage(Package):
-    origin: str
-
-    def __init__(self, package: str, /) -> None:
-        name, origin = Package._parse_package_str(package)
-
-        if origin is None:
-            assert name is not None
-            with lock as installed:
-                origin = installed["packages"][name]["origin"]
-
-        assert origin.startswith(("http://", "https://"))
-
-        if name is None:
-            name = origin.rsplit("/", 1)[-1].split(".", 1)[0].lower().replace("_", "-")
-
-        super().__init__(name)
-        self.origin = origin
-
-    @override
-    async def fetch(self) -> None:
-        with Status(f"⏬ Downloading {self}"):
-            self._fetched_sha = await fetch(
-                self._pkg_path,
-                self.origin,
-                missing_ok=False,
-                system_git=True,
-            )
-            assert self._fetched_sha is not None
-
-            metadata = read_text(
-                self._pkg_path,
-                "metadata.json",
-                revision=self._fetched_sha,
-            )
-            self._metadata = {} if metadata is None else json.loads(metadata)
-
-            self._upgrade_available = self._fetched_sha != self.installed_sha()
-
-    @override
-    async def download(self) -> str:
-        return await clone(
-            self._pkg_path,
-            self.origin,
-            revision=self._fetched_sha,
-            system_git=True,
-        )
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.name} @ {self.origin}"
-
-
-class _LocalPackage(Package):
-    origin: Path
-
-    def __init__(self, package: str, /) -> None:
-        name, origin = Package._parse_package_str(package)
-
-        if origin is None:
-            assert name is not None
-            with lock as installed:
-                origin = installed["packages"][name]["origin"]
-
-        if origin.startswith("file://"):
-            path = path_from_uri(origin)
-        else:
-            path = Path(origin).absolute()
-
-        if name is None:
-            name = path.name.lower().replace("_", "-")
-
-        super().__init__(name)
-        self.origin = path
-
-    @override
-    async def fetch(self) -> None:
-        try:
-            self._metadata = json.loads((self.origin / "metadata.json").read_text())
-        except FileNotFoundError:
-            self._metadata = {}
-        self._upgrade_available = True
-
-    @override
-    async def download(self) -> None:
-        assert self._metadata is not None
-        await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
-        self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
-        await aioshutil.copytree(self.origin, self._pkg_path, symlinks=True)
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.name} @ {self.origin.as_uri()}"
-
-
-class _Styro(Package):
-    def __init__(self, package: str = "styro", /) -> None:
-        assert package.lower() == "styro"
-        super().__init__("styro")
-
-    @override
-    def is_installed(self) -> bool:
-        return True
-
-    @override
-    async def resolve(
-        self,
-        *,
-        upgrade: bool = False,
-        _force_reinstall: bool = False,
-        _resolved: set[Package] | None = None,
-    ) -> set[Package]:
-        if not upgrade and not _force_reinstall:
-            return set()
-
-        self._upgrade_available = await check_for_new_version(verbose=False)
-
-        if not _force_reinstall and not self._upgrade_available:
-            return set()
-
-        if is_managed_installation():
-            print(
-                "🛑 Error: this is a managed installation of styro.",
-                file=sys.stderr,
-            )
-            print_upgrade_instruction()
-            sys.exit(1)
-
-        return {self}
-
-    @override
-    async def install(
-        self,
-        *,
-        upgrade: bool = False,
-        _force_reinstall: bool = False,
-        _deps: bool | dict[Package, asyncio.Event] = True,
-    ) -> None:
-        if not upgrade and not _force_reinstall:
-            print(
-                "✋ Package 'styro' is already installed.",
-            )
-            return
-
-        if is_managed_installation():
-            print(
-                "🛑 Error: this is a managed installation of styro.",
-                file=sys.stderr,
-            )
-            print_upgrade_instruction()
-            sys.exit(1)
-
-        self._upgrade_available = await check_for_new_version(verbose=False)
-
-        if not _force_reinstall and not self._upgrade_available:
-            print(
-                "✋ Package 'styro' is already up-to-date.",
-            )
-            return
-
-        await selfupgrade()
-
-        print("✅ Package 'styro' upgraded successfully.")
-
-    @override
-    async def uninstall(self, *, _force: bool = False, _keep_pkg: bool = False) -> None:
-        print(
-            "🛑 Error: styro cannot be uninstalled this way.",
-            file=sys.stderr,
-        )
-        if is_managed_installation():
-            print(
-                "💡 Use your package manager (e.g. pip) to uninstall styro.",
-                file=sys.stderr,
-            )
-        else:
-            print(
-                "💡 Delete the 'styro' binary in $FOAM_USER_APPBIN to uninstall.",
-                file=sys.stderr,
-            )
-        sys.exit(1)

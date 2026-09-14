@@ -12,7 +12,7 @@ from dulwich.objects import Blob
 from dulwich.refs import HEADREF
 from dulwich.repo import Repo
 
-from styro._subprocess import run
+from styro._utils.subprocess import run
 
 
 def _set_remote_url(repo: Repo, url: str) -> None:
