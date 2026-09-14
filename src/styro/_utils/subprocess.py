@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from styro._status import Status
+    from styro._utils.status import Status
 
 
 async def run(
