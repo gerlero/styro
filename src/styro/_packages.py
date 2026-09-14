@@ -756,6 +756,7 @@ class _GitPackage(Package):
                 self._pkg_path,
                 self.origin,
                 missing_ok=False,
+                system_git=True,
             )
             assert self._fetched_sha is not None
 
@@ -774,6 +775,7 @@ class _GitPackage(Package):
             self._pkg_path,
             self.origin,
             revision=self._fetched_sha,
+            system_git=True,
         )
 
     @override

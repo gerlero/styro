@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Literal, overload
 
+import aioshutil
 from dulwich import porcelain
 from dulwich.errors import NotGitRepository
 from dulwich.objects import Blob
 from dulwich.refs import HEADREF
 from dulwich.repo import Repo
 
-if TYPE_CHECKING:
-    from pathlib import Path
+from styro._subprocess import run
 
 
 def _set_remote_url(repo: Repo, url: str) -> None:
@@ -21,23 +21,38 @@ def _set_remote_url(repo: Repo, url: str) -> None:
     config.write_to_path()
 
 
-def _fetch_existing(repo: Repo, url: str) -> str:
+async def _fetch_existing(repo: Repo, url: str, *, system_git: bool = False) -> str:
     _set_remote_url(repo, url)
-    with open(os.devnull, "wb") as devnull:
-        result = porcelain.fetch(repo, "origin", errstream=devnull, quiet=True)
+    if system_git:
+        await run(["git", "fetch", "origin"], cwd=Path(repo.path))
+        refs = repo.get_refs()
+    with open(os.devnull, "wb") as devnull:  # noqa: ASYNC230
+        refs = (
+            await asyncio.to_thread(
+                porcelain.fetch, repo, "origin", errstream=devnull, quiet=True
+            )
+        ).refs
 
-    head = result.refs[HEADREF]
+    head = refs[HEADREF]
     assert head is not None
     return head.decode("ascii")
 
 
-def _fresh_clone(path: Path, url: str, revision: str | None = None) -> str:
-    shutil.rmtree(path, ignore_errors=True)
+async def _fresh_clone(
+    path: Path, url: str, revision: str | None = None, system_git: bool = False
+) -> str:
+    await aioshutil.rmtree(path, ignore_errors=True)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(os.devnull, "wb") as devnull:
-            repo = porcelain.clone(url, path, errstream=devnull)
+        if system_git:
+            await run(["git", "clone", url, str(path)], cwd=path.parent)
+            repo = Repo(path)
+        else:
+            with open(os.devnull, "wb") as devnull:  # noqa: ASYNC230
+                repo = await asyncio.to_thread(
+                    porcelain.clone, url, path, errstream=devnull
+                )
 
         if revision is None:
             return repo.head().decode("ascii")
@@ -45,47 +60,50 @@ def _fresh_clone(path: Path, url: str, revision: str | None = None) -> str:
         porcelain.reset(repo, "hard", revision)
         return revision
     except Exception:
-        shutil.rmtree(path, ignore_errors=True)
+        await aioshutil.rmtree(path, ignore_errors=True)
         raise
 
 
-def _fetch(path: Path, url: str, *, missing_ok: bool = True) -> str | None:
+@overload
+async def fetch(
+    path: Path, url: str, *, missing_ok: Literal[True] = ..., system_git: bool = ...
+) -> str | None: ...
+
+
+@overload
+async def fetch(
+    path: Path, url: str, *, missing_ok: Literal[False] = ..., system_git: bool = ...
+) -> str: ...
+
+
+async def fetch(
+    path: Path, url: str, *, missing_ok: bool = True, system_git: bool = False
+) -> str | None:
     try:
         repo = Repo(path)
     except (FileNotFoundError, NotGitRepository):
         if missing_ok:
             return None
-        return _fresh_clone(path, url)
+        return await _fresh_clone(path, url, system_git=system_git)
 
-    return _fetch_existing(repo, url)
+    return await _fetch_existing(repo, url, system_git=system_git)
 
 
-def _clone(path: Path, url: str, revision: str | None) -> str:
+async def clone(
+    path: Path, url: str, revision: str | None, system_git: bool = False
+) -> str:
     try:
         repo = Repo(path)
     except (FileNotFoundError, NotGitRepository):
-        return _fresh_clone(path, url, revision)
+        return await _fresh_clone(path, url, revision, system_git=system_git)
 
     if revision is None:
-        revision = _fetch_existing(repo, url)
+        revision = await _fetch_existing(repo, url, system_git=system_git)
     else:
         _set_remote_url(repo, url)
 
     porcelain.reset(repo, "hard", revision)
     return revision
-
-
-async def fetch(path: Path, url: str, *, missing_ok: bool = True) -> str | None:
-    return await asyncio.to_thread(
-        _fetch,
-        path,
-        url,
-        missing_ok=missing_ok,
-    )
-
-
-async def clone(path: Path, url: str, *, revision: str | None = None) -> str:
-    return await asyncio.to_thread(_clone, path, url, revision)
 
 
 def read_text(path: Path, subpath: str, *, revision: str | None = None) -> str | None:
