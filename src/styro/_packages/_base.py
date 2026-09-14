@@ -247,10 +247,10 @@ class Package:
 
         name, origin = Package._parse_package_str(package)
 
-        from styro._packages._git import GitPackage
-        from styro._packages._indexed import IndexedPackage
-        from styro._packages._local import LocalPackage
-        from styro._packages._self import Styro
+        if name == "styro":
+            from styro._packages._self import Styro
+
+            return super().__new__(Styro)
 
         with lock as installed:
             if name is not None and origin is None:
@@ -259,10 +259,15 @@ class Package:
 
             if origin is not None:
                 if origin.startswith(("http://", "https://")):
+                    from styro._packages._git import GitPackage
+
                     return super().__new__(GitPackage)
+                from styro._packages._local import LocalPackage
+
                 return super().__new__(LocalPackage)
-            if name == "styro":
-                return super().__new__(Styro)
+
+            from styro._packages._indexed import IndexedPackage
+
             return super().__new__(IndexedPackage)
 
     def __init__(self, name: str, /) -> None:
