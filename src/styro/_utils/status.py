@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import asyncio
 import sys
 import time
 from contextlib import AbstractContextManager
 from io import TextIOBase
-from typing import TYPE_CHECKING, ClassVar, TextIO
+from types import TracebackType
+from typing import ClassVar, TextIO
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -16,9 +15,6 @@ if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
-
-if TYPE_CHECKING:
-    from types import TracebackType
 
 
 class _StreamWrapper(TextIOBase):
@@ -44,7 +40,7 @@ sys.stderr = _StreamWrapper(sys.stderr)
 
 
 class Status(AbstractContextManager["Status"]):
-    _statuses: ClassVar[list[Status]] = []
+    _statuses: ClassVar[list["Status"]] = []
     _printed_lines: ClassVar[int] = 0
     _dots: ClassVar[int] = 3
     _animation_task: ClassVar[asyncio.Task]
