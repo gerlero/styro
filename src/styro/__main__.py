@@ -1,7 +1,5 @@
 """Package manager for OpenFOAM."""
 
-from __future__ import annotations
-
 import cyclopts
 
 from styro import __version__

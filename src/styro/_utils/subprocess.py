@@ -1,16 +1,11 @@
-from __future__ import annotations
-
 import asyncio
 import shlex
 import subprocess
 from collections import deque
 from io import StringIO
-from typing import TYPE_CHECKING
+from pathlib import Path
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from styro._utils.status import Status
+from styro._utils.status import Status
 
 
 async def run(
