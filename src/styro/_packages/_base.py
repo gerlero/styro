@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import contextlib
 import os
@@ -25,12 +23,11 @@ from styro._utils.subprocess import run
 if TYPE_CHECKING:
     from styro._packages._self import Styro
 
-
 _NAME_REGEX = re.compile(r"^(?!.*--)[a-z0-9]+(-[a-z0-9]+)*$")
 _install_lock = asyncio.Lock()
 
 
-def _check_for_duplicate_names(pkgs: set[Package], /) -> None:
+def _check_for_duplicate_names(pkgs: set["Package"], /) -> None:
     duplicate_names = {
         pkg.name for pkg in pkgs if len([p for p in pkgs if p.name == pkg.name]) > 1
     }
@@ -42,7 +39,7 @@ def _check_for_duplicate_names(pkgs: set[Package], /) -> None:
         sys.exit(1)
 
 
-async def _detect_cycles(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
+async def _detect_cycles(pkgs: set["Package"], /, *, upgrade: bool = False) -> None:
     """
     Detect cycles in the dependency graph before installation.
 
@@ -63,7 +60,7 @@ async def _detect_cycles(pkgs: set[Package], /, *, upgrade: bool = False) -> Non
     path: list[Package] = []
 
     async def visit(
-        pkg: Package,
+        pkg: "Package",
         /,
         *,
         pkg_upgrade: bool = False,
@@ -171,18 +168,18 @@ class Package:
         return None, package
 
     @staticmethod
-    def all_installed() -> set[Package]:
+    def all_installed() -> set["Package"]:
         with lock as installed:
             return {Package(name) for name in installed.get("packages", {})}
 
     @staticmethod
     @lock
     async def resolve_all(
-        pkgs: set[Package],
+        pkgs: set["Package"],
         /,
         *,
         upgrade: bool = False,
-    ) -> set[Package]:
+    ) -> set["Package"]:
         _check_for_duplicate_names(pkgs)
 
         # Detect cycles before attempting resolution
@@ -199,7 +196,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def install_all(pkgs: set[Package], /, *, upgrade: bool = False) -> None:
+    async def install_all(pkgs: set["Package"], /, *, upgrade: bool = False) -> None:
         to_install = {
             pkg: asyncio.Event()
             for pkg in await Package.resolve_all(pkgs, upgrade=upgrade)
@@ -219,7 +216,7 @@ class Package:
 
     @staticmethod
     @lock
-    async def uninstall_all(pkgs: set[Package], /) -> None:
+    async def uninstall_all(pkgs: set["Package"], /) -> None:
         dependents = set()
         for pkg in pkgs:
             dependents.update(pkg.installed_dependents())
@@ -236,12 +233,12 @@ class Package:
         )
 
     @overload
-    def __new__(cls, package: Literal["styro"], /) -> Styro: ...
+    def __new__(cls, package: Literal["styro"], /) -> "Styro": ...
 
     @overload
-    def __new__(cls, package: str, /) -> Package: ...
+    def __new__(cls, package: str, /) -> "Package": ...
 
-    def __new__(cls, package: str, /) -> Package:  # noqa: PYI034
+    def __new__(cls, package: str, /) -> "Package":  # noqa: PYI034
         if cls is not Package:
             return super().__new__(cls)
 
@@ -370,8 +367,8 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _resolved: set[Package] | None = None,
-    ) -> set[Package]:
+        _resolved: set["Package"] | None = None,
+    ) -> set["Package"]:
         if _resolved is None:
             _resolved = set()
         elif self in _resolved:
@@ -441,11 +438,11 @@ class Package:
             except KeyError:
                 return None
 
-    def requested_dependencies(self) -> set[Package]:
+    def requested_dependencies(self) -> set["Package"]:
         assert self._metadata is not None
         return {Package(name) for name in self._metadata.get("requires", [])}
 
-    def installed_dependents(self) -> set[Package]:
+    def installed_dependents(self) -> set["Package"]:
         with lock as installed:
             return {
                 Package(name)
@@ -465,7 +462,7 @@ class Package:
         *,
         upgrade: bool = False,
         _force_reinstall: bool = False,
-        _deps: bool | dict[Package, asyncio.Event] = True,
+        _deps: bool | dict["Package", asyncio.Event] = True,
     ) -> None:
         from styro._packages._local import LocalPackage
 
