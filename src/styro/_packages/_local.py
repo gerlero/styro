@@ -17,8 +17,6 @@ from styro._utils.paths import path_from_uri
 
 
 class LocalPackage(Package):
-    origin: Path
-
     def __init__(self, package: str, /) -> None:
         name, origin = Package._parse_package_str(package)
 
@@ -40,6 +38,7 @@ class LocalPackage(Package):
 
     @override
     async def fetch(self) -> None:
+        assert isinstance(self.origin, Path)
         try:
             self._metadata = json.loads((self.origin / "metadata.json").read_text())
         except FileNotFoundError:
@@ -48,6 +47,7 @@ class LocalPackage(Package):
 
     @override
     async def download(self) -> None:
+        assert isinstance(self.origin, Path)
         assert self._metadata is not None
         await aioshutil.rmtree(self._pkg_path, ignore_errors=True)
         self._pkg_path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,4 +55,5 @@ class LocalPackage(Package):
 
     @override
     def __str__(self) -> str:
+        assert isinstance(self.origin, Path)
         return f"{self.name} @ {self.origin.as_uri()}"
