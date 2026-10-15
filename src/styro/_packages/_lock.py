@@ -1,16 +1,12 @@
-from __future__ import annotations
-
 import fcntl
 import json
 import sys
+from collections.abc import Generator
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from styro._openfoam import platform_path
 from styro._utils.context import reentrantcontextmanager
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 @reentrantcontextmanager
