@@ -16,8 +16,6 @@ from styro._utils.status import Status
 
 
 class GitPackage(Package):
-    origin: str
-
     def __init__(self, package: str, /) -> None:
         name, origin = Package._parse_package_str(package)
 
@@ -36,6 +34,7 @@ class GitPackage(Package):
 
     @override
     async def fetch(self) -> None:
+        assert isinstance(self.origin, str)
         with Status(f"⏬ Downloading {self}"):
             self._fetched_sha = await fetch(
                 self._pkg_path,
@@ -56,6 +55,7 @@ class GitPackage(Package):
 
     @override
     async def download(self) -> str:
+        assert isinstance(self.origin, str)
         return await clone(
             self._pkg_path,
             self.origin,

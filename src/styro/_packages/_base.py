@@ -286,6 +286,7 @@ class Package:
                 file=sys.stderr,
             )
             sys.exit(1)
+
         self.name = name
         self.origin: str | Path | None = None
         self._metadata: dict[str, Any] | None = None
