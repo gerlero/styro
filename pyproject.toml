@@ -46,7 +46,7 @@ Repository = "https://github.com/gerlero/styro"
 styro = "styro.__main__:app"
 
 [dependency-groups]
-lint = ["ruff>=0.16.5,<0.17"]
+lint = ["ruff>=0.16.5,<0.18"]
 typing = ["ty>=0.0.76,<0.1"]
 test = [
     "pytest>=8,<10",
