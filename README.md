@@ -77,6 +77,12 @@ Choose any of the following methods:
     /bin/bash -c "$(curl https://raw.githubusercontent.com/gerlero/styro/main/install.sh)"
     ```
 
+* On GitHub Actions via [setup-styro](https://github.com/gerlero/setup-styro):
+
+    ```yaml
+    - uses: gerlero/setup-styro@v1
+    ```
+
 * [Docker](https://www.docker.com) image:
 
     ```bash
