@@ -42,13 +42,12 @@ def _lock() -> Generator[dict[str, Any], None, None]:
         try:
             yield installed
         finally:
-            if installed:
-                if installed != installed_copy:
-                    f.seek(0)
-                    f.write(json.dumps(installed, indent=2))
-                    f.truncate()
-            else:
-                installed_path.unlink()
+            if not installed:
+                installed.update({"version": 1, "packages": {}})
+            if installed != installed_copy:
+                f.seek(0)
+                f.write(json.dumps(installed, indent=2))
+                f.truncate()
 
 
 lock = _lock()
