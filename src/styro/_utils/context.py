@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import sys
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, ContextDecorator
 from functools import wraps
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+if sys.version_info < (3, 15):
+    import inspect
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -24,7 +27,25 @@ R = TypeVar("R")
 S = TypeVar("S")
 
 
-class _ReentrantContextManager(AbstractContextManager[R]):
+class _ContextDecorator(ContextDecorator):
+    """Backport of https://github.com/python/cpython/issues/125862."""
+
+    if sys.version_info < (3, 15):
+
+        def __call__(self, func: Callable[P, S]) -> Callable[P, S]:
+            if inspect.iscoroutinefunction(func):
+
+                @wraps(func)
+                async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+                    with cast("AbstractContextManager[Any]", self._recreate_cm()):
+                        return await func(*args, **kwargs)
+
+                return cast("Callable[P, S]", async_wrapper)
+
+            return super().__call__(func)
+
+
+class _ReentrantContextManager(AbstractContextManager[R], _ContextDecorator):
     def __init__(self, func: Callable[[], Generator[R, None, None]], /) -> None:
         self._func = func
         self._lock_depth = 0
@@ -59,14 +80,6 @@ class _ReentrantContextManager(AbstractContextManager[R]):
             else:
                 msg = "Generator did not terminate properly"
                 raise RuntimeError(msg)
-
-    def __call__(self, func: Callable[P, S]) -> Callable[P, S]:
-        @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> S:
-            with self:
-                return func(*args, **kwargs)
-
-        return wrapper
 
 
 def reentrantcontextmanager(
