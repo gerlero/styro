@@ -3,15 +3,10 @@ from __future__ import annotations
 import sys
 from contextlib import AbstractContextManager, ContextDecorator
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 if sys.version_info < (3, 15):
     import inspect
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
 
 if sys.version_info >= (3, 12):
     from typing import override
