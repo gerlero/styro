@@ -1,26 +1,18 @@
-from __future__ import annotations
-
 import sys
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, ContextDecorator
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from types import TracebackType
+from typing import Any, ParamSpec, TypeVar, cast
 
 if sys.version_info < (3, 15):
     import inspect
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
-    from types import TracebackType
 
 P = ParamSpec("P")
 R = TypeVar("R")
